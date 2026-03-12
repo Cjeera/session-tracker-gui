@@ -7,6 +7,7 @@ use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
 /// Normalizes process names for comparison
 fn normalize(string: &str) -> String 
 {
+    // Given string is lowercased, making the process search case-insensitive.
     string.to_ascii_lowercase()
         .chars()
         .filter(|c| c.is_alphanumeric())
@@ -32,7 +33,7 @@ pub fn find_process_by_name(game_input: &str) -> Result<Pid, AppError>
             .and_then(|matches| matches.then_some(p.pid()))
     })
     {
-        // If the name is found, it's returned to the frontend. If not, error message is returned to frontend.
+        // If the name is found, it's process ID is returned to search_processes, then the frontend. If not, error message is returned.
         Some(pid) =>
         {
             Ok(pid)
@@ -49,20 +50,19 @@ fn process_exists(system: &mut System, pid: Pid) -> bool
 }
 
 /// Tracks a running application's session time.
-pub fn track_session(game_input: &String, mut pid: u32) -> Result<SessionRust, AppError>
+pub fn track_session(game_input: &String, pid: u32) -> Result<SessionRust, AppError>
 {
+    // Start timestamp is taken.
+    let start = Utc::now();
+
     // Gets a list of all running processes.
     let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()));
     
-    // User is prompted to enter a process name. If not found, user is prompted to enter until valid input is passed.
-    let start = Utc::now();
-
     // Sets the amount of time that the thread will sleep for.
     let sleep_time = time::Duration::from_secs(1);
 
     // A new thread is created which contains the process exists check. 
     // Thread sleeps for 1 second, then checks if found process is still running. Loop repeats if still running.
-    
     let tracker_thread = thread::spawn(move || 
     {
         let pid = Pid::from_u32(pid);
@@ -77,13 +77,16 @@ pub fn track_session(game_input: &String, mut pid: u32) -> Result<SessionRust, A
         }
     });
 
+    // Rust waits for the thread to finish, meaning the game has been exited.
     let _ = tracker_thread.join();
 
+    // End timestamp is taken.
     let end = Utc::now();
 
     // The duration between the start and end in seconds is calculated.
     let duration_seconds = (end - start).num_seconds().max(0);
 
+    // The data is gathered inot the session_data struct.
     let session_data = SessionRust
     {
         game: game_input.to_string(),
@@ -98,6 +101,7 @@ pub fn track_session(game_input: &String, mut pid: u32) -> Result<SessionRust, A
 
 pub fn end_session(session_notes: &str, mut session_data: SessionRust) -> Result<(), AppError>
 {
+    // Sets sessions notes to None if empty, assigns Some(session_notes) to the struct field if not. 
     if session_notes.is_empty()
     {
         session_data.notes = None;
@@ -107,6 +111,7 @@ pub fn end_session(session_notes: &str, mut session_data: SessionRust) -> Result
         session_data.notes = Some(session_notes.to_string());   
     }
 
+    // The struct data is inserted into the database.
     insert_data(session_data)?;
 
     Ok(())

@@ -1,14 +1,13 @@
 pub mod error;
 pub mod session_tracker;
 pub mod database_operations;
-pub mod input;
 pub mod csv_fallback;
 
 use crate::session_tracker::{track_session, end_session, find_process_by_name};
 use crate::database_operations::{SessionRust};
 use crate::error::AppError;
 
-
+/// Takes frontend input (game_input) and sends it to find_process_by_name function. Returns the process ID as an unsigned integer to the frontend.
 #[tauri::command]
 async fn search_processes(game_input: String) -> Result<u32, AppError>
 {
@@ -19,6 +18,7 @@ async fn search_processes(game_input: String) -> Result<u32, AppError>
     }
 }
 
+/// Takes frontend input (game_input) and the pid and sends it to track_session function. Returns a struct containing session data to the frontend.
 #[tauri::command]
 async fn start_tracker(game_input: String, pid: u32) -> Result<SessionRust, AppError>
 {
@@ -29,6 +29,7 @@ async fn start_tracker(game_input: String, pid: u32) -> Result<SessionRust, AppE
     }
 }
 
+/// Takes frontend input (session_notes) and the session_data struct and sends it to end_session function.
 #[tauri::command]
 async fn end_tracker(session_notes: &str, session_data: SessionRust) -> Result<(), AppError>
 {
