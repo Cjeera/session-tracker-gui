@@ -1,5 +1,4 @@
 use crate::error::AppError;
-use crate::input::{read_line_safe, read_numeric_input};
 use crate::csv_fallback::insert_data_fallback;
 use chrono::{DateTime, Utc};
 use rusqlite::{Connection};
@@ -65,12 +64,9 @@ fn map_row_to_session(row: &rusqlite::Row<'_>) -> Result<Session, rusqlite::Erro
 }
 
 /// Handles database query menu
-pub fn database_queries(conn: &Connection) -> Result<(), AppError>
+pub fn database_queries(conn: &Connection, id: i64, query_choice: &str) -> Result<(), AppError>
 {
-    println!("1. Select All\n2. Select Specific Row");
-    let query_choice = read_line_safe()?;
-
-    match query_choice.as_str()
+    match query_choice
     {
         "1" =>
         {
@@ -97,8 +93,6 @@ pub fn database_queries(conn: &Connection) -> Result<(), AppError>
 
         "2" =>
         {
-            let id: i32 = read_numeric_input("Enter Row ID:")?;
-
             let mut stmt = conn.prepare("SELECT * FROM sessions WHERE id = ?1")?;
 
             // The search for in the query (?1) is set to the inputted ID.
