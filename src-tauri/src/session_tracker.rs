@@ -1,0 +1,113 @@
+use crate::error::AppError;
+use crate::database_operations::{insert_data, SessionRust};
+use chrono::{Utc};
+use std::{thread, time};
+use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
+
+/// Normalizes process names for comparison
+fn normalize(string: &str) -> String 
+{
+    string.to_ascii_lowercase()
+        .chars()
+        .filter(|c| c.is_alphanumeric())
+        .collect()
+}
+
+/// Finds a running process by a user inputted name.
+pub fn find_process_by_name(game_input: &str) -> Result<Pid, AppError> 
+{
+    let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()));
+
+    system.refresh_processes(ProcessesToUpdate::All, true);
+
+    let search_norm = normalize(game_input);
+
+    // Searches all processes for the inputted name and returns the process ID if one is found.
+    // The inputted name and the process list have been lowercased and had special characters removed, making the search case-insensitive.
+    match system.processes().values().find_map(|p| 
+    {
+        p.name()
+            .to_str()
+            .map(|name| normalize(name).contains(&search_norm))
+            .and_then(|matches| matches.then_some(p.pid()))
+    })
+    {
+        // If the name is found, it's returned to the frontend. If not, error message is returned to frontend.
+        Some(pid) =>
+        {
+            Ok(pid)
+        }
+        None => return Err(AppError::NotFound())
+    }
+}
+
+/// Checks if a specific process is still running.
+fn process_exists(system: &mut System, pid: Pid) -> bool 
+{
+    system.refresh_processes(ProcessesToUpdate::Some(&[pid]), true);
+    system.process(pid).is_some()
+}
+
+/// Tracks a running application's session time.
+pub fn track_session(game_input: &String, mut pid: u32) -> Result<SessionRust, AppError>
+{
+    // Gets a list of all running processes.
+    let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()));
+    
+    // User is prompted to enter a process name. If not found, user is prompted to enter until valid input is passed.
+    let start = Utc::now();
+
+    // Sets the amount of time that the thread will sleep for.
+    let sleep_time = time::Duration::from_secs(1);
+
+    // A new thread is created which contains the process exists check. 
+    // Thread sleeps for 1 second, then checks if found process is still running. Loop repeats if still running.
+    
+    let tracker_thread = thread::spawn(move || 
+    {
+        let pid = Pid::from_u32(pid);
+        loop 
+        {
+            thread::sleep(sleep_time);
+
+            if !process_exists(&mut system, pid) 
+            {
+                break;
+            }
+        }
+    });
+
+    let _ = tracker_thread.join();
+
+    let end = Utc::now();
+
+    // The duration between the start and end in seconds is calculated.
+    let duration_seconds = (end - start).num_seconds().max(0);
+
+    let session_data = SessionRust
+    {
+        game: game_input.to_string(),
+        start_ts: start,
+        end_ts: end,
+        duration_seconds: duration_seconds,
+        notes: None,
+    };
+
+    Ok(session_data)
+}
+
+pub fn end_session(session_notes: &str, mut session_data: SessionRust) -> Result<(), AppError>
+{
+    if session_notes.is_empty()
+    {
+        session_data.notes = None;
+    }
+    else 
+    {
+        session_data.notes = Some(session_notes.to_string());   
+    }
+
+    insert_data(session_data)?;
+
+    Ok(())
+}
