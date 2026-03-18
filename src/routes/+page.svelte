@@ -13,12 +13,11 @@
   let pid = $state(0);
   let StopwatchPayload = $state({
     elapsedMs: 0,
-    isRunning: false,
   });
   let seconds = $state(0);
   let minutes = $state(0);
   let hours = $state(0);
-  let stopwatchDisplay = $state("Elapsed Time: ");
+  let stopwatchDisplay = $state("Elapsed Time: 00:00:00");
 
   async function trackSession(event) {
     event.preventDefault();
@@ -52,7 +51,6 @@
     // The elapsed time in milliseconds is taken from backend and formatted into HH:MM:SS
     await listen("stopwatch-tick", (event) => {
       StopwatchPayload.elapsedMs = event.payload.elapsedMs;
-      StopwatchPayload.isRunning = event.payload.isRunning;
       let totalSeconds = Math.floor(StopwatchPayload.elapsedMs / 1000);
       hours = Math.floor(totalSeconds / 3600);
       minutes = Math.floor(totalSeconds / 60) % 60;

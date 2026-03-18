@@ -13,7 +13,6 @@ use std::time::Instant;
 struct StopwatchPayload 
 {
     elapsed_ms: u128,
-    is_running: bool,
 }
 
 /// Normalizes process names for comparison
@@ -67,7 +66,6 @@ fn stopwatch_tick(app: &AppHandle, stopwatch: &StopwatchImpl<Instant>)
     let payload = StopwatchPayload
     {
         elapsed_ms: stopwatch.elapsed().as_millis(),
-        is_running: stopwatch.is_running(),
     };
 
     // The payload struct is sent to the frontend.
@@ -82,7 +80,6 @@ fn stopwatch_stop(app: &AppHandle, stopwatch: &mut StopwatchImpl<Instant>)
     let payload = StopwatchPayload
     {
         elapsed_ms: stopwatch.elapsed().as_millis(),
-        is_running: stopwatch.is_running(),
     };
 
     // The payload struct is sent to the frontend.
@@ -117,7 +114,7 @@ pub fn track_session(game_input: &String, pid: u32, app: AppHandle) -> Result<Se
             {
                 break;
             }
-            
+
             stopwatch_tick(&app, &stopwatch);        
         }
 
