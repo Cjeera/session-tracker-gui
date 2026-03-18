@@ -1,8 +1,20 @@
 use crate::error::AppError;
 use crate::database_operations::{insert_data, SessionRust};
 use chrono::{Utc};
+use serde::Serialize;
 use std::{thread, time};
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
+use tauri::{AppHandle, Emitter};
+use libsw::{Sw, StopwatchImpl};
+use std::time::Instant;
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StopwatchPayload 
+{
+    elapsed_ms: u128,
+    is_running: bool,
+}
 
 /// Normalizes process names for comparison
 fn normalize(string: &str) -> String 
@@ -49,8 +61,36 @@ fn process_exists(system: &mut System, pid: Pid) -> bool
     system.process(pid).is_some()
 }
 
+/// Function that sends elapsed time in milliseconds to the frontend.
+fn stopwatch_tick(app: &AppHandle, stopwatch: &StopwatchImpl<Instant>)
+{
+    let payload = StopwatchPayload
+    {
+        elapsed_ms: stopwatch.elapsed().as_millis(),
+        is_running: stopwatch.is_running(),
+    };
+
+    // The payload struct is sent to the frontend.
+    app.emit("stopwatch-tick", payload).unwrap();
+}
+
+/// Function that stops the stopwatch.
+fn stopwatch_stop(app: &AppHandle, stopwatch: &mut StopwatchImpl<Instant>)
+{
+    let _ = stopwatch.stop();
+
+    let payload = StopwatchPayload
+    {
+        elapsed_ms: stopwatch.elapsed().as_millis(),
+        is_running: stopwatch.is_running(),
+    };
+
+    // The payload struct is sent to the frontend.
+    app.emit("stopwatch-tick", payload).unwrap();
+}
+
 /// Tracks a running application's session time.
-pub fn track_session(game_input: &String, pid: u32) -> Result<SessionRust, AppError>
+pub fn track_session(game_input: &String, pid: u32, app: AppHandle) -> Result<SessionRust, AppError>
 {
     // Start timestamp is taken.
     let start = Utc::now();
@@ -65,6 +105,9 @@ pub fn track_session(game_input: &String, pid: u32) -> Result<SessionRust, AppEr
     // Thread sleeps for 1 second, then checks if found process is still running. Loop repeats if still running.
     let tracker_thread = thread::spawn(move || 
     {
+        // A stopwatch is created that will be sent to the frontend.
+        let mut stopwatch = Sw::new_started();
+
         let pid = Pid::from_u32(pid);
         loop 
         {
@@ -74,7 +117,12 @@ pub fn track_session(game_input: &String, pid: u32) -> Result<SessionRust, AppEr
             {
                 break;
             }
+            
+            stopwatch_tick(&app, &stopwatch);        
         }
+
+        // Once the application is exited, the stopwatch is stopped.
+        stopwatch_stop(&app, &mut stopwatch);
     });
 
     // Rust waits for the thread to finish, meaning the game has been exited.

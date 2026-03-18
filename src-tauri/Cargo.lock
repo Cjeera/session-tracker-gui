@@ -1927,6 +1927,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "libsw"
+version = "3.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2c161a527b6532e9da627817769689c9d90082e5476f5b819d1152b5c76e6901"
+dependencies = [
+ "libsw-core",
+]
+
+[[package]]
+name = "libsw-core"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "262dad4b91186067a332cac496dd358ace6e9a4acdb050c68ca2920513e9d462"
+
+[[package]]
 name = "linux-raw-sys"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3234,6 +3249,7 @@ version = "0.1.0"
 dependencies = [
  "chrono",
  "csv",
+ "libsw",
  "rusqlite",
  "serde",
  "serde_json",
