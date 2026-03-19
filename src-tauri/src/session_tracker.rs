@@ -155,7 +155,7 @@ pub fn end_session(session_notes: &str, mut session_data: SessionRust) -> Result
     {
         session_data.notes = Some(session_notes.to_string());   
     }
-
+    
     // The struct data is inserted into the database.
     insert_data(session_data)?;
 

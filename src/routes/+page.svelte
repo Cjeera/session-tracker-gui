@@ -1,138 +1,81 @@
 <script>
-  import { invoke } from "@tauri-apps/api/core";
   import "../app.css";
-  import { Button, Input } from "flowbite-svelte";
-  import { listen } from "@tauri-apps/api/event";
+  import {
+    FloatingLabelInput,
+    Textarea,
+    Label,
+    Button,
+    Helper,
+  } from "flowbite-svelte";
 
-  let headerMessage = $state("Enter a game title to get started");
-  let gameInput = $state("");
-  let sessionNotes = $state("");
-  let resultMsg = $state("");
-  let gameFound = $state(false);
-  let sessionData = $state({});
-  let pid = $state(0);
-  let StopwatchPayload = $state({
-    elapsedMs: 0,
-  });
-  let seconds = $state(0);
-  let minutes = $state(0);
-  let hours = $state(0);
-  let stopwatchDisplay = $state("Elapsed Time: 00:00:00");
-
-  async function trackSession(event) {
-    event.preventDefault();
-
-    resultMsg = "";
-
-    // Any input less or equal to characters will be rejected.
-    if (gameInput.length <= 2) {
-      resultMsg = "Enter a name at least 3 characters long";
-      return;
-    }
-
-    // gameInput is sent to the backend.
-    pid = await invoke("search_processes", { gameInput }).catch((error) => {
-      resultMsg = error;
-      console.error(error);
-      return;
-    });
-
-    // Function returns if no process ID is found.
-    if (!pid) {
-      return;
-    }
-
-    gameFound = true;
-
-    // Header message displays confirmation message.
-    headerMessage =
-      "Found " + gameInput + " (PID " + pid + ")! Tracking Started";
-
-    // The elapsed time in milliseconds is taken from backend and formatted into HH:MM:SS
-    await listen("stopwatch-tick", (event) => {
-      StopwatchPayload.elapsedMs = event.payload.elapsedMs;
-      let totalSeconds = Math.floor(StopwatchPayload.elapsedMs / 1000);
-      hours = Math.floor(totalSeconds / 3600);
-      minutes = Math.floor(totalSeconds / 60) % 60;
-      seconds = Math.floor(totalSeconds % 60);
-      stopwatchDisplay =
-        "Elapsed Time:\n" +
-        String(hours).padStart(2, "0") +
-        ":" +
-        String(minutes).padStart(2, "0") +
-        ":" +
-        String(seconds).padStart(2, "0");
-    });
-    // The main tracker backend logic is called.
-    const result = await invoke("start_tracker", { gameInput, pid }).catch(
-      (error) => {
-        resultMsg = error;
-        console.error(error);
-      },
-    );
-
-    if (!result) {
-      return;
-    }
-
-    // The session data object returned by the backend function is assigned to sessionData.
-    sessionData = result;
-    headerMessage = "Sesssion ended!"
-  }
-
-  // The sessionData object and the sessionNotes string are sent to the backend for database insertion.
-  function endSession(event) {
-    event.preventDefault();
-    invoke("end_tracker", { sessionNotes, sessionData }).catch((error) => {
-      resultMsg = error;
-      console.error(error);
-    });
-
-    resultMsg = "Session data saved to database!";
-
-    // Session data, game input, session notes, header message and game found are reset to original state.
-    sessionData = {};
-    gameInput = "";
-    sessionNotes = "";
-    headerMessage = "Enter a game title to get started";
-    gameFound = false;
-  }
+  import { tracker } from "./sessionTracker.svelte.js";
 </script>
 
-<main class="flex flex-col p-64 items-center text-center text-white">
-  <form class="flex flex-col items-center gap-4" onsubmit={trackSession}>
-    <h2 class="text-4xl font-bold mb-4">{headerMessage}</h2>
-    {#if gameFound}
-      <h3 class="text-2xl font-bold mb-4">{stopwatchDisplay}</h3>
-    {/if}
-    {#if !gameFound}
-      <Input
+<main class="min-h-screen flex flex-col justify-center items-center gap-8 text-white">
+  <form class="flex flex-col items-center" onsubmit={tracker.trackSession}>
+    <h2 class="text-4xl font-bold mb-8 text-center">{tracker.headerMessage}</h2>
+    {#if tracker.gameFound}
+      <h3 class="text-2xl font-bold mb-4">{tracker.stopwatchDisplay}</h3>
+    {:else if !tracker.gameFound}
+      <FloatingLabelInput
+        class="w-96"
+        color="blue"
+        clearable
+        clearableColor="blue"
+        variant="outlined"
         id="game-input"
-        class="p-2 rounded mb-2 max-w-xs"
-        placeholder="Enter a name..."
-        bind:value={gameInput}
+        bind:value={tracker.gameInput}
         required
-      />
-      <Button type="submit" outline color="blue" class="cursor-pointer"
+        type="text"
+        classes={{ label: "!bg-primary" }}
+      >
+        Enter a name...
+      </FloatingLabelInput>
+      <div class="min-h-4 items-end">
+        {#if tracker.errorFlag}
+          <Helper color="red">
+            <span class="font-medium text-left">{tracker.resultMsg}</span>
+          </Helper>
+        {/if}
+      </div>
+      <Button type="submit" outline color="blue" class="mt-4 cursor-pointer"
         >Enter</Button
       >
-      <p>{resultMsg}</p>
+      {#if tracker.successMsg.length > 0}
+        <p>{tracker.successMsg}</p>
+      {/if}
     {/if}
   </form>
 
-  {#if Object.keys(sessionData).length > 0}
-    <form class="flex flex-col items-center gap-4" onsubmit={endSession}>
-      <h2 class="text-2xl font-bold mb-4">Enter session notes</h2>
-      <Input
+  {#if Object.keys(tracker.sessionData).length > 0}
+    <form class="flex flex-col items-center" onsubmit={tracker.endSession}>
+      <FloatingLabelInput
+        class="w-96 mb-3"
+        color="blue"
+        clearable
+        clearableColor="blue"
+        variant="outlined"
+        id="new-game-input"
+        bind:value={tracker.newGameInput}
+        type="text"
+        classes={{ label: "!bg-primary" }}
+      >
+        Enter a new title... (Optional)
+      </FloatingLabelInput>
+      <Textarea
         id="notes-input"
-        class="p-2 rounded mb-2 max-w-xs"
-        placeholder="Enter session notes..."
-        bind:value={sessionNotes}
+        class="p-2 rounded mb-2 mt-3 w-96 h-24 placeholder-blue-400!"
+        classes={{ wrapper: "!bg-primary"}}
+        placeholder="Enter session notes... (Optional)"
+        bind:value={tracker.sessionNotes}
       />
-      <Button type="submit" outline color="blue" class="cursor-pointer"
+      <Button type="submit" outline color="blue" class="mt-4 cursor-pointer"
         >Enter</Button
       >
-      <p>If you don't wish to enter any notes, click enter</p>
+      <p>
+        If you don't wish to enter any notes or overwrite entered title, just
+        click enter
+      </p>
     </form>
   {/if}
 </main>

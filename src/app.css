@@ -5,3 +5,9 @@
 
 @source "../node_modules/flowbite-svelte/dist";
 @source "../node_modules/flowbite-svelte-icons/dist";
+
+@theme {
+    --color-primary: #121212;
+
+    --color-secondary: #2b7fff;
+}
