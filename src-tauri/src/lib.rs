@@ -3,18 +3,18 @@ pub mod session_tracker;
 pub mod database_operations;
 pub mod csv_fallback;
 
-use crate::session_tracker::{track_session, end_session, find_process_by_name};
+use crate::session_tracker::{track_session, end_session, process_search, Process};
 use crate::database_operations::{SessionRust};
 use crate::error::AppError;
 use tauri::AppHandle;
 
 /// Takes frontend input (game_input) and sends it to find_process_by_name function. Returns the process ID as an unsigned integer to the frontend.
 #[tauri::command]
-async fn search_processes(game_input: String) -> Result<u32, AppError>
+async fn search_processes(game_input: String) -> Result<Vec<Process>, AppError>
 {
-    match find_process_by_name(&game_input)
+    match process_search(&game_input)
     {
-        Ok(pid) => Ok(pid.as_u32()),
+        Ok(search_results) => Ok(search_results),
         Err(error) => Err(error)
     }
 }

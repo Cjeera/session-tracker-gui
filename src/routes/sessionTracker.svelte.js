@@ -14,6 +14,8 @@ class SessionTracker {
     // The stopwatch variable that will be displayed in the frontend.
     stopwatchDisplay = $state("Elapsed Time: 00:00:00");
 
+    searchResults = $state([]);
+
     // A variable that will contain the game title input to be sent to the backend.
     gameInput = $state("");
 
@@ -49,17 +51,25 @@ class SessionTracker {
         elapsedMs: 0,
     });
 
-    trackSession = async (event) => {
+    searchSuccessful = $state(false);
+
+    searchProcesses = async (event) => {
         event.preventDefault();
-        
+
+        // Error flag is reset, and result message is cleared.
+        this.errorFlag = false;
+
+        this.searchResults = [];
+
         // Stopwatch is reset.
         this.stopwatchDisplay = "Elapsed Time: 00:00:00";
 
         // Success message is reset.
         this.successMsg = "";
 
-        // Error flag is reset, and result message is cleared.
-        this.errorFlag = false;
+        this.errorMsg = "";
+
+        this.searchSuccessful = false;
 
         // Any input less or equal to characters will be rejected.
         if (this.gameInput.length <= 2) {
@@ -69,19 +79,27 @@ class SessionTracker {
         }
 
         // gameInput is sent to the backend.
-        this.pid = await invoke("search_processes", { gameInput: this.gameInput }).catch((error) => {
+        this.searchResults = await invoke("search_processes", { gameInput: this.gameInput }).catch((error) => {
             this.errorFlag = true;
             this.resultMsg = error;
             console.error(error);
             return;
         });
 
-        // Function returns if no process ID is found.
-        if (!this.pid) {
-            this.errorFlag = true;
-            this.resultMsg = "Game not found";
-            return;
+        if (this.errorFlag) {
+            return
         }
+
+        this.searchSuccessful = true;
+    }
+
+    trackSession = async (process) => {
+        this.pid = process.pid;
+        this.gameInput = process.processName;
+
+        this.searchSuccessful = false;
+
+        this.errorMsg = "";
 
         // Error flag is reset, and game found is set to true.
         this.errorFlag = false;
@@ -89,7 +107,7 @@ class SessionTracker {
 
         // Header message displays confirmation message.
         this.headerMessage =
-            "Found " + this.gameInput + " (PID " + this.pid + ")! Tracking Started";
+            "Currently Tracking " + this.gameInput + "\n(PID " + this.pid +")";
 
         // The elapsed time in milliseconds is taken from backend and formatted into HH:MM:SS
         this.unlistenStopwatch = await listen("stopwatch-tick", (event) => {
@@ -146,10 +164,11 @@ class SessionTracker {
 
             this.sessionData = {};
             this.gameInput = "";
-            this.newGameInput = ""; 
+            this.newGameInput = "";
             this.sessionNotes = "";
             this.headerMessage = "Enter a game title to get started";
             this.gameFound = false;
+            this.searchResults = [];
 
         } catch (error) {
             // If database save fails, the code jumps here.

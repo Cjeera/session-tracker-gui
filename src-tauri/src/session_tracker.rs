@@ -7,6 +7,17 @@ use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
 use tauri::{AppHandle, Emitter};
 use libsw::{Sw, StopwatchImpl};
 use std::time::Instant;
+use fuzzy_matcher::skim::SkimMatcherV2;
+use fuzzy_matcher::FuzzyMatcher;
+use std::path::PathBuf;
+
+#[derive(Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Process
+{
+    pid: u32,
+    name: String,
+}
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -15,42 +26,68 @@ struct StopwatchPayload
     elapsed_ms: u128,
 }
 
-/// Normalizes process names for comparison
+/// Helper function for removing extension from process names
 fn normalize(string: &str) -> String 
 {
-    // Given string is lowercased, making the process search case-insensitive.
-    string.to_ascii_lowercase()
-        .chars()
-        .filter(|c| c.is_alphanumeric())
-        .collect()
+    // Makes a PathBuf from string.
+    let string_path = PathBuf::from(string);
+
+    // Non extension portion of string_path is taken, then converted to string and returned.
+    string_path.file_stem().unwrap_or_default().to_str().unwrap_or_default().to_string()
 }
 
-/// Finds a running process by a user inputted name.
-pub fn find_process_by_name(game_input: &str) -> Result<Pid, AppError> 
+/// Finds a running process by a user inputted name. Returns a vector with Process structs.
+pub fn process_search(game_input: &str) -> Result<Vec<Process>, AppError> 
 {
+    // Gets a list of all running processes.
     let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()));
 
+    // Refreshes the process list.
     system.refresh_processes(ProcessesToUpdate::All, true);
 
-    let search_norm = normalize(game_input);
+    // A fuzzy matcher is created.
+    let matcher = SkimMatcherV2::default().smart_case();
 
-    // Searches all processes for the inputted name and returns the process ID if one is found.
-    // The inputted name and the process list have been lowercased and had special characters removed, making the search case-insensitive.
-    match system.processes().values().find_map(|p| 
+    // A vector that contains an integer for storing the score of the found result, and a process struct. 
+    let mut matches: Vec<(i64, Process)> = Vec::new();
+
+    // Loops through list of processes
+    for process in system.processes().values()
     {
-        p.name()
-            .to_str()
-            .map(|name| normalize(name).contains(&search_norm))
-            .and_then(|matches| matches.then_some(p.pid()))
-    })
-    {
-        // If the name is found, it's process ID is returned to search_processes, then the frontend. If not, error message is returned.
-        Some(pid) =>
+        // Process ID and process name is added to vector if it matches.
+        match matcher.fuzzy_match(process.name().to_str().unwrap_or_default(), game_input)
         {
-            Ok(pid)
-        }
-        None => return Err(AppError::NotFound())
+            Some(found_score) =>
+            {
+                matches.push((found_score, Process { pid: (process.pid().as_u32()), name: (process.name().to_str().unwrap().to_string()) }));
+            }       
+            None => continue     
+        };
     }
+
+    if matches.is_empty()
+    {
+        return Err(AppError::NotFound())
+    }
+    
+    // The results are sorted into descending order by score, and are then truncated to only keep the top 10 results.
+    matches.sort_by(|a, b| b.0.cmp(&a.0));
+    matches.truncate(10);
+
+    // A vector contaning process structs is created.
+    let mut search_results: Vec<Process> = Vec::new();
+
+    // Loops through matches struct.
+    for entry in matches
+    {
+        // The extension is removed from the process name.
+        let name_norm = normalize(&entry.1.name);
+
+        // Process ID from matches vector and normalised name are pushed into search_results.
+        search_results.push(Process { pid: entry.1.pid, name: name_norm} );
+    }
+
+    Ok(search_results)
 }
 
 /// Checks if a specific process is still running.
@@ -75,8 +112,10 @@ fn stopwatch_tick(app: &AppHandle, stopwatch: &StopwatchImpl<Instant>)
 /// Function that stops the stopwatch.
 fn stopwatch_stop(app: &AppHandle, stopwatch: &mut StopwatchImpl<Instant>)
 {
+    // Stops the stopwatch
     let _ = stopwatch.stop();
 
+    // Gets the elapsed time in milliseconds
     let payload = StopwatchPayload
     {
         elapsed_ms: stopwatch.elapsed().as_millis(),
@@ -86,15 +125,21 @@ fn stopwatch_stop(app: &AppHandle, stopwatch: &mut StopwatchImpl<Instant>)
     app.emit("stopwatch-tick", payload).unwrap();
 }
 
-/// Tracks a running application's session time.
+/// Tracks a running application's session time. Returns a struct containing session data.
 pub fn track_session(game_input: &String, pid: u32, app: AppHandle) -> Result<SessionRust, AppError>
 {
-    // Start timestamp is taken.
-    let start = Utc::now();
-
     // Gets a list of all running processes.
     let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()));
-    
+
+    // Returns early if process doesn't exist
+    if !process_exists(&mut system, Pid::from_u32(pid))
+    {
+        return Err(AppError::NotFound())
+    }
+
+    // Start timestamp is taken.
+    let start = Utc::now();
+ 
     // Sets the amount of time that the thread will sleep for.
     let sleep_time = time::Duration::from_secs(1);
 
@@ -131,7 +176,7 @@ pub fn track_session(game_input: &String, pid: u32, app: AppHandle) -> Result<Se
     // The duration between the start and end in seconds is calculated.
     let duration_seconds = (end - start).num_seconds().max(0);
 
-    // The data is gathered inot the session_data struct.
+    // The data is gathered into the session_data struct.
     let session_data = SessionRust
     {
         game: game_input.to_string(),
