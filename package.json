@@ -19,6 +19,7 @@
     "tailwindcss": "^4.1.18"
   },
   "devDependencies": {
+    "@flowbite-svelte-plugins/datatable": "^0.4.1",
     "@sveltejs/adapter-static": "^3.0.10",
     "@sveltejs/kit": "^2.0.0",
     "@sveltejs/vite-plugin-svelte": "^6.2.4",

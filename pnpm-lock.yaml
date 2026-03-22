@@ -21,6 +21,9 @@ importers:
         specifier: ^4.1.18
         version: 4.1.18
     devDependencies:
+      '@flowbite-svelte-plugins/datatable':
+        specifier: ^0.4.1
+        version: 0.4.1(svelte@5.49.0)(tailwindcss@4.1.18)
       '@sveltejs/adapter-static':
         specifier: ^3.0.10
         version: 3.0.10(@sveltejs/kit@2.55.0(@sveltejs/vite-plugin-svelte@6.2.4(svelte@5.49.0)(vite@7.3.1(jiti@2.6.1)(lightningcss@1.32.0)))(svelte@5.49.0)(typescript@5.9.3)(vite@7.3.1(jiti@2.6.1)(lightningcss@1.32.0)))
@@ -222,6 +225,12 @@ packages:
 
   '@floating-ui/utils@0.2.10':
     resolution: {integrity: sha512-aGTxbpbg8/b5JfU1HXSrbH3wXZuLPJcNEcZQFMxLs3oSzgtVu6nFPkbbGGUvBcUjKV2YyB9Wxxabo+HEH9tcRQ==}
+
+  '@flowbite-svelte-plugins/datatable@0.4.1':
+    resolution: {integrity: sha512-LUZlLxbE/HJPj5Hd82Crgs6sR3Yvm5PP/7iaLYCQzBU61PW/iDXg85AKTq7sKeSAflHtY4kVPJuTt5vuI8W5fg==}
+    peerDependencies:
+      svelte: ^5.0.0
+      tailwindcss: ^4.1.4
 
   '@jridgewell/gen-mapping@0.3.13':
     resolution: {integrity: sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA==}
@@ -756,6 +765,9 @@ packages:
   date-fns@4.1.0:
     resolution: {integrity: sha512-Ukq0owbQXxa/U3EGtsdVBkR1w7KOQ5gIBqdH2hkvknzZPYvBxb/aa6E8L7tmjFtkwZBu3UXBbjIgPo/Ez4xaNg==}
 
+  dayjs@1.11.20:
+    resolution: {integrity: sha512-YbwwqR/uYpeoP4pu043q+LTDLFBLApUP6VxRihdfNTqu4ubqMlGDLd6ErXhEgsyvY0K6nCs7nggYumAN+9uEuQ==}
+
   deepmerge@4.3.1:
     resolution: {integrity: sha512-3sUqbMEc77XqpdNO7FRyRog+eW3ph+GYCbj+rK+uYyRMuwsVy0rMiVtPn+QJlKFvWP/1PYpapqYn0Me2knFn+A==}
     engines: {node: '>=0.10.0'}
@@ -769,6 +781,9 @@ packages:
 
   devalue@5.6.4:
     resolution: {integrity: sha512-Gp6rDldRsFh/7XuouDbxMH3Mx8GMCcgzIb1pDTvNyn8pZGQ22u+Wa+lGV9dQCltFQ7uVw0MhRyb8XDskNFOReA==}
+
+  diff-dom@5.2.1:
+    resolution: {integrity: sha512-G6WquwIa/XOxiYDYRMxfJj+c+a6LXMv7zgXoAQ3eRjTYkc8Lc4Aq97krTu/B15r243FR7dyeSxDenzKtO6sbfA==}
 
   enhanced-resolve@5.18.4:
     resolution: {integrity: sha512-LgQMM4WXU3QI+SYgEc2liRgznaD5ojbmY3sb8LxyguVkIg5FxdpTkvk72te2R38/TGKxH634oLxXRGY6d7AP+Q==}
@@ -1142,6 +1157,9 @@ packages:
   set-cookie-parser@3.0.1:
     resolution: {integrity: sha512-n7Z7dXZhJbwuAHhNzkTti6Aw9QDDjZtm3JTpTGATIdNzdQz5GuFs22w90BcvF4INfnrL5xrX3oGsuqO5Dx3A1Q==}
 
+  simple-datatables@10.2.0:
+    resolution: {integrity: sha512-Lq3k5JZ4WXT0G0dhIAUfYc3M+GRs9y8U15wfbF7i67/rPm8wa43Iyrac+yP+lXQVTy1MPCPvxvZ44P9N4k0OhQ==}
+
   sirv@3.0.2:
     resolution: {integrity: sha512-2wcC/oGxHis/BoHkkPwldgiPSYcpZK3JU28WoMVv55yHJgcZ8rlXvuG9iZggz+sU1d4bRgIGASwyWqjxu3FM0g==}
     engines: {node: '>=18'}
@@ -1345,6 +1363,12 @@ snapshots:
       '@floating-ui/utils': 0.2.10
 
   '@floating-ui/utils@0.2.10': {}
+
+  '@flowbite-svelte-plugins/datatable@0.4.1(svelte@5.49.0)(tailwindcss@4.1.18)':
+    dependencies:
+      simple-datatables: 10.2.0
+      svelte: 5.49.0
+      tailwindcss: 4.1.18
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
@@ -1727,6 +1751,8 @@ snapshots:
 
   date-fns@4.1.0: {}
 
+  dayjs@1.11.20: {}
+
   deepmerge@4.3.1: {}
 
   detect-libc@2.1.2: {}
@@ -1734,6 +1760,8 @@ snapshots:
   devalue@5.6.2: {}
 
   devalue@5.6.4: {}
+
+  diff-dom@5.2.1: {}
 
   enhanced-resolve@5.18.4:
     dependencies:
@@ -2094,6 +2122,11 @@ snapshots:
       mri: 1.2.0
 
   set-cookie-parser@3.0.1: {}
+
+  simple-datatables@10.2.0:
+    dependencies:
+      dayjs: 1.11.20
+      diff-dom: 5.2.1
 
   sirv@3.0.2:
     dependencies:
