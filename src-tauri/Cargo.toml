@@ -27,4 +27,5 @@ chrono = { version = "^0.4.44", features = ["serde"] }
 sysinfo = "^0.38.4"
 csv = "^1.4.0"
 thiserror = "^2.0.18"
-libsw = "3.5.0"
+libsw = "^3.5.0"
+fuzzy-matcher = "^0.3.7"
