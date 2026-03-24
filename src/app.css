@@ -7,7 +7,5 @@
 @source "../node_modules/flowbite-svelte-icons/dist";
 
 @theme {
-    --color-primary: #121212;
-
-    --color-secondary: #2b7fff;
+    --color-primary: #1f2227;
 }

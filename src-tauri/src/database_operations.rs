@@ -5,17 +5,18 @@ use rusqlite::{Connection};
 use serde::{Deserialize, Serialize};
 use std::fs;
 
-/// A struct for housing select results from the SQLite database.
-#[derive(Debug)]
+/// A struct for housing select results from the SQLite database to be sent to the frontend.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Session
 {
-    id: i32,
-    game: String,
+    session_id: i64,
     start_ts: DateTime<Utc>,
     end_ts: DateTime<Utc>,
     duration_seconds: i64,
     notes: Option<String>,
 }
+
 
 /// A struct for housing session data to be sent to the SQLite database.
 #[derive(Serialize, Deserialize)]
@@ -30,7 +31,7 @@ pub struct SessionRust
 
 /// A struct for housing session data for CSV fallback.
 #[derive(Debug, Deserialize)]
-struct SessionRecord 
+struct SessionCSV 
 {
     game: String,
     start_ts: String,
@@ -40,87 +41,161 @@ struct SessionRecord
     notes: Option<String>,
 }
 
+/// A struct for storing game IDs, game titles and cover art.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Game
+{
+    game_id: i64,
+    title: String,
+    cover_path: Option<String>,
+}
+
+/// A struct for play time info on a specific game.
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameStats
+{
+    game_id: i64,
+    total_playtime: i64,
+    total_sessions: i64,
+    last_played: Option<String>,
+}
+
+/// Opens and returns a sqlite connection.
 pub fn open_connection() -> Result<Connection, rusqlite::Error>
 {
     let conn = Connection::open("sessions.db")?;
 
+    // Enables foreign keys.
     conn.execute_batch("PRAGMA foreign_keys=ON;")?;
 
     Ok(conn)
 }
 
 /// Maps database rows into Session struct
-fn map_row_to_session(row: &rusqlite::Row<'_>) -> Result<Session, rusqlite::Error> 
+fn map_sessions(row: &rusqlite::Row<'_>) -> Result<Session, rusqlite::Error> 
 {
     Ok(Session 
     {
-        id: row.get(0)?,
-        game: row.get(1)?,
-        start_ts: row.get(2)?,
-        end_ts: row.get(3)?,
-        duration_seconds: row.get(4)?,
-        notes: row.get(5)?,
+        session_id: row.get(0)?,
+        start_ts: row.get(1)?,
+        end_ts: row.get(2)?,
+        duration_seconds: row.get(3)?,
+        notes: row.get(4)?,
     })
 }
 
-/// Handles database query menu
-pub fn database_queries(conn: &Connection, id: i64, query_choice: &str) -> Result<(), AppError>
+/// Gets all sessions for a specific game via it's ID.
+pub fn get_sessions(game_id: i64) -> Result<Vec<Session>, AppError>
 {
-    match query_choice
-    {
-        "1" =>
-        {
-            let mut stmt = conn.prepare(
-                "SELECT id, game, start_ts, end_ts, duration_seconds, notes FROM sessions"
-            )?;
+    let conn = open_connection()?;
 
-            let rows = stmt.query_map([], map_row_to_session)?;
+    let mut query = conn.prepare(
+        "SELECT
+            session_id,
+            start_ts,
+            end_ts,
+            duration_seconds,
+            notes
+        FROM sessions
+        WHERE game_id = ?1")?;
+    
+    // Maps the rows to a session struct, then pushes structs into a vector.
+    let sessions = query.query_map([&game_id], map_sessions)?.collect::<Result<_,_>>()?;
 
-            for row in rows
-            {
-                let session = row?;
-                println!(
-                    "ID = {}, Game = {}, Start = {}, End = {}, Duration = {}, Notes = {}",
-                    session.id,
-                    session.game,
-                    session.start_ts,
-                    session.end_ts,
-                    session.duration_seconds,
-                    session.notes.as_deref().unwrap_or("")
-                );
-            }
-        }
-
-        "2" =>
-        {
-            let mut stmt = conn.prepare("SELECT * FROM sessions WHERE id = ?1")?;
-
-            // The search for in the query (?1) is set to the inputted ID.
-            let rows = stmt.query_map([id], map_row_to_session)?;
-
-            for row in rows
-            {
-                let session = row?;
-                println!(
-                    "ID = {}, Game = {}, Start = {}, End = {}, Duration = {}, Notes = {}",
-                    session.id,
-                    session.game,
-                    session.start_ts,
-                    session.end_ts,
-                    session.duration_seconds,
-                    session.notes.as_deref().unwrap_or("")
-                );
-            }
-        }
-        _ =>
-        {
-            return Err(AppError::Parse);
-        }
-    }
-
-    Ok(())
+    Ok(sessions)
 }
 
+/// Maps database rows to game struct.
+fn map_games(row: &rusqlite::Row<'_>) -> Result<Game, rusqlite::Error>
+{
+    Ok(Game 
+    {
+        game_id: row.get(0)?,
+        title: row.get(1)?,
+        cover_path: row.get(2)?,
+    })
+}
+
+/// Gets all games in the database and the path to it's cover art.
+pub fn get_games() -> Result<Vec<Game>, AppError>
+{
+    let conn = open_connection()?;
+
+    let mut query = conn.prepare(
+        "SELECT 
+            games.game_id, 
+            games.title,
+            game_covers.path
+        FROM games
+        LEFT JOIN game_covers ON
+        games.game_id = game_covers.game_id;")?;
+
+    // Maps the rows to a Game struct, then pushes structs into a vector.
+    let games: Vec<Game> = query.query_map([], map_games)?.collect::<Result<_,_>>()?;
+
+    Ok(games)
+}
+
+/// Maps database rows to game stats struct.
+fn map_game_stats(row: &rusqlite::Row<'_>) -> Result<GameStats, rusqlite::Error>
+{
+    Ok(GameStats 
+    {
+        game_id: row.get(0)?,
+        total_playtime: row.get(1)?,
+        total_sessions: row.get(2)?,
+        last_played: row.get(3)?,
+    })
+}
+
+/// Gets total playtime, total sessions and the timestamp of the previous session.
+pub fn get_stats(game_id: i64) -> Result<GameStats, AppError>
+{
+    let conn = open_connection()?;
+
+    let mut query = conn.prepare(
+        "SELECT
+            game_id,
+            COALESCE(SUM(duration_seconds), 0),
+            COUNT(session_id),
+            MAX(start_ts)
+        FROM sessions
+        WHERE game_id = ?1;")?;
+    
+    let mut game_stats = query.query_row([&game_id], map_game_stats)?;
+
+    // If last played is empty, meaning the user hasn't played it, then "Not Played" is assinged to last_played.
+    if game_stats.last_played.is_none()
+    {
+        game_stats.last_played = Some("Not Played".to_string());
+    }
+
+    Ok(game_stats)
+}
+
+pub fn get_game_by_id(game_id: i64) -> Result<Game, AppError>
+{
+    let conn = open_connection()?;
+
+    let mut query = conn.prepare(
+        "SELECT 
+            games.game_id, 
+            games.title,
+            game_covers.path
+        FROM games
+        LEFT JOIN game_covers ON games.game_id = game_covers.game_id
+        WHERE games.game_id = ?1;"
+    )?;
+
+    let game = query.query_row([&game_id], map_games)?;
+
+    Ok(game)
+
+}
+
+/// Creates the tables used in the program.
 pub fn create_tables(conn: &Connection) -> Result<(), AppError>
 {
     conn.execute_batch(
@@ -132,7 +207,7 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError>
 
         CREATE TABLE IF NOT EXISTS sessions (
             session_id INTEGER PRIMARY KEY,
-            game_id INT NOT NULL,
+            game_id INTEGER NOT NULL,
             start_ts TEXT NOT NULL,
             end_ts TEXT NOT NULL,
             duration_seconds INTEGER NOT NULL,
@@ -141,9 +216,9 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError>
         );
 
         CREATE TABLE IF NOT EXISTS game_covers (
-            game_id INT PRIMARY KEY,
+            game_id INTEGER PRIMARY KEY,
             path TEXT,
-            FOREIGN KEY (game_id) REFERENCES games(game_id)
+            FOREIGN KEY (game_id) REFERENCES games(game_id) ON DELETE CASCADE
         );"
     )?;
 
@@ -229,7 +304,7 @@ pub fn insert_data_from_csv(conn: &mut Connection) -> Result<(), AppError>
 
     for result in reader.deserialize() 
     {
-        let record: SessionRecord = match result 
+        let record: SessionCSV = match result 
         {
             Ok(rec) => rec,
             Err(_) => 
@@ -239,7 +314,7 @@ pub fn insert_data_from_csv(conn: &mut Connection) -> Result<(), AppError>
         };
 
         tx.execute(
-            "INSERT INTO sessions (game, start_ts, end_ts, duration_seconds, notes)
+            "INSERT INTO sessions (game_id, start_ts, end_ts, duration_seconds, notes)
             VALUES (?1, ?2, ?3, ?4, ?5)",
             (
                 record.game.as_str(),

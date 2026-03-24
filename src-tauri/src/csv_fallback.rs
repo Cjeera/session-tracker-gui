@@ -51,6 +51,5 @@ pub fn insert_data_fallback(session_data: SessionRust) -> Result<(), AppError>
     )?;
 
     writer.flush()?;
-    println!("Session data saved to CSV.");
     Ok(())
 }
