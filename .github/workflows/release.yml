@@ -59,6 +59,10 @@ jobs:
       - name: install frontend dependencies
         run: pnpm install
 
+      # Run Rust Backend Unit Tests
+      - name: Run backend tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
       # Build and Publish with Tauri Action
       - uses: tauri-apps/tauri-action@v0.6.1
         env:
