@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use crate::database_operations::{insert_data, SessionRust};
+use crate::database_operations::{insert_data, open_connection, SessionRust};
 use chrono::{Utc};
 use serde::Serialize;
 use std::{thread, time};
@@ -27,7 +27,7 @@ struct StopwatchPayload
 }
 
 /// Helper function for removing extension from process names
-fn normalize(string: &str) -> String 
+fn normalize(string: &str) -> String
 {
     // Makes a PathBuf from string.
     let string_path = PathBuf::from(string);
@@ -200,9 +200,65 @@ pub fn end_session(session_notes: &str, mut session_data: SessionRust) -> Result
     {
         session_data.notes = Some(session_notes.to_string());   
     }
+
+    let conn = open_connection()?;
     
     // The struct data is inserted into the database.
-    insert_data(session_data)?;
+    insert_data(&conn, session_data)?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests
+{
+    use super::*;
+
+    #[test]
+    fn test_normalise()
+    {
+        assert_eq!(normalize("Game.exe"), "Game");
+        assert_eq!(normalize("GAME.exe"), "GAME");
+        assert_eq!(normalize("game.exe"), "game");
+        assert_eq!(normalize("gamE.exe"), "gamE");
+        assert_eq!(normalize("1029.exe"), "1029");
+        assert_eq!(normalize("!£*($*%).exe"), "!£*($*%)");
+        assert_eq!(normalize("NoExtensionHere"), "NoExtensionHere");
+        assert_eq!(normalize("complex.game.name.exe"), "complex.game.name");
+    }
+
+
+    #[test]
+    fn test_process_found()
+    {
+        let result = process_search("System");
+        
+        assert!(result.is_ok(), "Expected ok, since System always exists and is running");
+
+        match result
+        {
+            Ok(found_process) =>
+            {
+                for entry in found_process
+                {
+                    println!("Found {} with PID {}", entry.name, entry.pid);
+                }
+            }
+            Err(_) => panic!("Expected success!")
+        }
+    }
+
+    #[test]
+    fn test_process_not_found()
+    {
+        let result = process_search("THISDOESNTEXIST!)!)!!))!");
+
+        assert!(result.is_err(), "Expected an error because the process doesn't exist");
+
+        match result
+        {
+            Err(AppError::NotFound()) => {},
+            _ => panic!("Expected AppError::NotFound, got something else"),
+        }
+    }
 }

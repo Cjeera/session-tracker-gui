@@ -151,9 +151,18 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError>
 }
 
 /// Inserts session into database.
-pub fn insert_data(session_data: SessionRust) -> Result<(), AppError>
+pub fn insert_data(conn: &Connection, session_data: SessionRust) -> Result<(), AppError>
 {
-    let conn = open_connection()?;
+    if session_data.game.trim().is_empty()
+    {
+        return Err(AppError::Message("title cannot be empty!".to_string()))
+    }
+
+    if session_data.duration_seconds.is_negative()
+    {
+        return Err(AppError::Message("Duration cannot be negative!".to_string()))
+    }
+
     create_tables(&conn)?;
 
     let start_str = session_data.start_ts.to_rfc3339();
@@ -245,4 +254,123 @@ pub fn insert_data_from_csv(conn: &mut Connection) -> Result<(), AppError>
     tx.commit()?;
     
     Ok(())
+}
+
+#[cfg(test)]
+mod tests
+{
+    use super::*;
+    use chrono::TimeZone;
+    
+    #[test]
+    fn test_insert_good_data()
+    {
+        let conn = Connection::open_in_memory().unwrap();
+        // Struct with empty session notes.
+        let good_session_full = SessionRust 
+        {
+            game: String::from("Cyberpunk 2077"),
+            start_ts: Utc.with_ymd_and_hms(2023, 10, 1, 14, 0, 0).unwrap(),
+            end_ts: Utc.with_ymd_and_hms(2023, 10, 1, 16, 0, 0).unwrap(),
+            duration_seconds: 7200,
+            notes: Some(String::from("Completed main questline")),
+        };
+
+        // Struct with populated session notes.
+        let good_session_minimal = SessionRust 
+        {
+            game: String::from("Stardew Valley"),
+            start_ts: Utc.with_ymd_and_hms(2023, 10, 2, 9, 0, 0).unwrap(),
+            end_ts: Utc.with_ymd_and_hms(2023, 10, 2, 9, 30, 0).unwrap(),
+            duration_seconds: 1800,
+            notes: None,
+        };
+        
+        // Both session data structs are inserted to database.
+        let result_one = insert_data(&conn, good_session_full);
+        let result_two = insert_data(&conn, good_session_minimal);
+        
+        // Checks that both were successfull
+        assert!(result_one.is_ok());
+        assert!(result_two.is_ok());
+    }
+
+    #[test]
+    fn test_insert_empty_title()
+    {
+        let conn = Connection::open_in_memory().unwrap();
+
+        // Struct with an empty title
+        let edge_case_empty_title = SessionRust 
+        {
+            game: String::from(""), 
+            start_ts: Utc::now(),
+            end_ts: Utc::now(),
+            duration_seconds: 0,
+            notes: None,
+        };
+
+        // Struct data is inserted into database, error expected.
+        let result_one = insert_data(&conn, edge_case_empty_title);
+
+        // Checks if error returned.
+        assert!(result_one.is_err());
+    }
+
+    #[test]
+    fn test_insert_minus_int()
+    {
+        let conn = Connection::open_in_memory().unwrap();
+
+        let bad_session_negative_time = SessionRust 
+        {
+            game: String::from("Tenet: The Game"),
+            start_ts: Utc.with_ymd_and_hms(2023, 10, 5, 12, 0, 0).unwrap(),
+            end_ts: Utc.with_ymd_and_hms(2023, 10, 5, 10, 0, 0).unwrap(), 
+            duration_seconds: -7200, 
+            notes: Some(String::from("Time is moving backwards")),
+        };
+
+        let result_one = insert_data(&conn, bad_session_negative_time);
+
+        assert!(result_one.is_err());
+    }
+
+    #[test]
+    fn test_duration_zero()
+    {
+        let conn = Connection::open_in_memory().unwrap();
+
+        let edge_case_zero_duration = SessionRust 
+        {
+            game: String::from("Accidental Launch"),
+            start_ts: Utc.with_ymd_and_hms(2023, 10, 6, 8, 0, 0).unwrap(),
+            end_ts: Utc.with_ymd_and_hms(2023, 10, 6, 8, 0, 0).unwrap(),
+            duration_seconds: 0,
+            notes: None,
+        };
+
+        let result_one = insert_data(&conn, edge_case_zero_duration);
+
+        assert!(result_one.is_ok());
+    }
+
+    #[test] 
+    fn insert_large_string()
+    {
+        let conn = Connection::open_in_memory().unwrap();
+        
+        let edge_case_huge_string = SessionRust 
+        {
+            game: String::from("Skyrim"),
+            start_ts: Utc.with_ymd_and_hms(2023, 10, 7, 18, 0, 0).unwrap(),
+            end_ts: Utc.with_ymd_and_hms(2023, 10, 7, 20, 0, 0).unwrap(),
+            duration_seconds: 7200,
+            notes: Some("A".repeat(10_000)),
+        };
+
+        let result_one = insert_data(&conn, edge_case_huge_string);
+
+        assert!(result_one.is_ok());
+    }
 }
