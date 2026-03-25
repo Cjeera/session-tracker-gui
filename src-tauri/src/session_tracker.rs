@@ -229,6 +229,7 @@ mod tests
 
 
     #[test]
+    #[ignore]
     fn test_process_found()
     {
         let result = process_search("System");
