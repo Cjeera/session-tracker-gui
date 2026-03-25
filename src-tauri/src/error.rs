@@ -22,7 +22,7 @@ pub enum AppError
     #[error("{0}")]
     Message(String),
 
-    #[error("Game not found!")]
+    #[error("No Game Found!")]
     NotFound()
 }
 
