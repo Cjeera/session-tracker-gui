@@ -8,7 +8,7 @@
 <Timeline>
 
     {#each sessions as session}
-        <TimelineItem title="Notes:" date={formatDate(session.startTs)}>{session.notes || "No session notes"}</TimelineItem>
+        <TimelineItem class="text-gray-300" title="Notes:" date={formatDate(session.startTs)}>{session.notes || "No session notes"}</TimelineItem>
     {/each}
 
 </Timeline>

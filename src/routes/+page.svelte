@@ -18,6 +18,13 @@
   } from "flowbite-svelte";
 
   import { tracker } from "./sessionTracker.svelte.js";
+
+  import { onDestroy } from 'svelte';
+
+  onDestroy(() => {
+		tracker.resultMsg = "";
+    tracker.successMsg = "";
+	});
 </script>
 
 <main

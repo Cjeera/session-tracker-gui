@@ -31,9 +31,6 @@ class SessionTracker {
     // A variable that will contain user inputted session notes.
     sessionNotes = $state("");
 
-    // A variable for diaplaying error messages.
-    errorMsg = $state("");
-
     // A variable for displaying success messages.
     successMsg = $state("");
 
@@ -67,8 +64,6 @@ class SessionTracker {
         // Success message is reset.
         this.successMsg = "";
 
-        this.errorMsg = "";
-
         this.searchSuccessful = false;
 
         // Any input less or equal to characters will be rejected.
@@ -98,8 +93,6 @@ class SessionTracker {
         this.gameInput = process.processName;
 
         this.searchSuccessful = false;
-
-        this.errorMsg = "";
 
         // Error flag is reset, and game found is set to true.
         this.errorFlag = false;

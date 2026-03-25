@@ -48,14 +48,21 @@
     let sortedSessions = $derived.by(() => {
         // Returns the raw array early if no sorting key is active.
         if (!sortKey) return sessions;
+        const currentKey = sortKey;
 
         // A shallow copy of the sessions array is created and sorted to avoid mutating the original prop.
         return [...sessions].sort((a, b) => {
-            let valA = a[sortKey];
-            let valB = b[sortKey];
+            let valA = a[currentKey];
+            let valB = b[currentKey];
 
-            // The values are subtracted to determine their chronological or numerical order based on direction.
-            return sortDirection === "asc" ? valA - valB : valB - valA;
+            // Use < and > instead of subtraction. This handles BOTH numbers and ISO timestamp strings perfectly.
+            if (valA < valB) {
+                return sortDirection === "asc" ? -1 : 1;
+            }
+            if (valA > valB) {
+                return sortDirection === "asc" ? 1 : -1;
+            }
+            return 0; // If they are exactly equal
         });
     });
 
@@ -72,8 +79,8 @@
 {#if !selected}
     <Table 
         hoverable={true} 
-        divClass="bg-primary! border-0 shadow-none relative overflow-x-auto" 
-        class="w-full text-left text-white"
+        classes={{ div: "bg-primary! border-0 shadow-none relative overflow-x-auto" }} 
+        class="w-full text-left"
     >
         <TableHead>
             <TableHeadCell onclick={() => handleSort('sessionId')} class="cursor-pointer hover:text-blue-400 select-none transition-colors">
