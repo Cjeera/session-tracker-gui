@@ -6,8 +6,7 @@ pub mod csv_fallback;
 use crate::session_tracker::{track_session, end_session, process_search, Process};
 use crate::database_operations::{get_games, get_stats, get_sessions, get_game_by_id, Session, SessionRust, Game, GameStats};
 use crate::error::AppError;
-use tauri::{App, AppHandle};
-use tauri::ipc::private::ResultTag;
+use tauri::AppHandle;
 
 #[tauri::command]
 async fn get_game_list() -> Result<Vec<Game>, AppError>
@@ -48,7 +47,6 @@ async fn get_single_game(game_id: i64) -> Result<Game, AppError>
         Err(error) => Err(error),
     }
 }
-
 
 /// Takes frontend input (game_input) and sends it to find_process_by_name function. Returns the process ID as an unsigned integer to the frontend.
 #[tauri::command]

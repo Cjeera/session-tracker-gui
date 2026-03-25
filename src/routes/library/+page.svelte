@@ -1,39 +1,38 @@
 <script>
     import {
         Card,
-        Button,
-        Tabs,
-        TabItem,
-        Timeline,
-        TimelineItem,
-        Activity,
-        ActivityItem,
-        Group,
-        GroupItem,
     } from "flowbite-svelte";
-    import { Table } from "@flowbite-svelte-plugins/datatable";
-    import { Chart } from "@flowbite-svelte-plugins/chart";
     import { onMount } from "svelte";
     import { invoke } from "@tauri-apps/api/core";
 
+    // Component state variables
     let errorMsg = $state("");
     let games = $state([]);
     let success = $state(false);
 
+    /** * Fetches the user's game library from the Tauri backend.
+     * Resets the current state, invokes the Rust command, and populates the UI.
+     */
     async function getGames() {
+        // Reset state to default before attempting the fetch
         errorMsg = "";
         success = false;
         games = [];
 
         try {
+            // Await the response from the Rust backend command 'get_game_list'
             games = await invoke("get_game_list");
+            
+            // Mark the fetch as successful to trigger the UI render in the template
             success = true;
         } catch (error) {
+            // Capture and log any errors that occur during the fetch
             errorMsg = error;
             console.error("Failed to load games:", error);
         }
     }
 
+    // Automatically fetch the games as soon as the component is mounted to the DOM
     onMount(() => {
         getGames();
     });

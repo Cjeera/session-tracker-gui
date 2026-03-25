@@ -1,23 +1,54 @@
 <script>
-    import { Card, Table, TableBody, TableBodyCell, TableBodyRow, TableHead, TableHeadCell } from "flowbite-svelte";
+    import { Tabs, TabItem } from "flowbite-svelte";
     import { onMount } from "svelte";
     import { invoke } from "@tauri-apps/api/core";
     import { page } from "$app/state";
-
-    let game = $state({});
     
-    // Grab the ID from the URL as a string
+    // Component imports
+    import SessionList from "./SessionList.svelte";
+    import SessionTimeline from "./SessionTimeline.svelte";
+    import Stats from "./Stats.svelte";
+    import { formatDuration } from "./timeFormatting";
+
+    // --- COMPONENT STATE ---
+    
+    // Reactively extracts the 'id' parameter from the current URL string.
     let rawId = $derived(page.url.searchParams.get("id"));
     
+    // Data stores for the fetched backend information
+    let game = $state({});
     let gameStats = $state({});
-    let gameSessions = $state([]);
-    let errorMsg = $state("");
+    let sessions = $state([]);
+
+    // UI state trackers
+    let errorMsg = $state();
     let success = $state(false);
 
+    /** * Fetches all tracked sessions for the currently selected game.
+     */
+    async function getSessions() {
+        // Clear the array before fetching to prevent stale data
+        sessions = [];
+        
+        try {
+            // Convert the URL string ID into a number for Rust's u32/i32 expectation
+            let numericId = Number(rawId);
+            
+            // Await the response from the Rust backend
+            sessions = await invoke("get_game_sessions", { gameId: numericId });
+        } catch (error) {
+            console.error("Failed to load sessions:", error);
+        }
+    }
+
+    /** * Fetches the core metadata (title, cover path, etc.) for a single game.
+     */
     async function getGame() {
         try {
-            // Convert to a number so Rust accepts it!
+            // Convert the URL string ID into a number
             let numericId = Number(rawId);
+            
+            // Await the game data from the Rust backend
             game = await invoke("get_single_game", { gameId: numericId });
         } catch (error) {
             errorMsg = error;
@@ -25,15 +56,22 @@
         }
     }
 
+    /** * Fetches aggregated statistics (total playtime, session counts) for the game.
+     */
     async function getGameStats() {
+        // Reset state before fetching
         errorMsg = "";
         success = false;
         gameStats = {};
 
         try {
-            // Pass the ID here!
+            // Convert the URL string ID into a number
             let numericId = Number(rawId);
+            
+            // Await the stats payload from the Rust backend
             gameStats = await invoke("get_game_stats", { gameId: numericId });
+            
+            // Mark the fetch as successful to update dependent UI elements
             success = true;
         } catch (error) {
             errorMsg = error;
@@ -41,56 +79,21 @@
         }
     }
 
-    async function getSessions() {
-        gameSessions = [];
-        try {
-            // Pass the ID here too!
-            let numericId = Number(rawId);
-            gameSessions = await invoke("get_game_sessions", { gameId: numericId });
-            success = true;
-        } catch (error) {
-            errorMsg = error;
-            console.error("Failed to load sessions:", error);
-        }
-    }
-
+    // Automatically trigger data fetches when the component is mounted to the DOM.
     onMount(() => {
-        // Only run if we actually have an ID in the URL
+        // Only attempt to fetch data if an ID was successfully parsed from the URL.
         if (rawId) {
             getGame();
             getGameStats();
             getSessions();
         }
     });
-
-    function formatDate(timestampString) {
-        const date = new Date(timestampString);
-
-        return date.toLocaleDateString();
-    }
-
-    function formatTime(timestampString) {
-        const date = new Date(timestampString);
-
-        return date.toLocaleTimeString();
-    }
-
-    function formatDuration(durationSeconds) {
-        let hours = Math.floor( durationSeconds / 3600);
-        let minutes = Math.floor((durationSeconds % 3600) / 60);
-        let seconds = durationSeconds % 60;
-
-        ;
-
-        return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
-    }
 </script>
 
-<main class="min-h-screen text-white p-8">
-    
+<main class="min-h-screen p-8">
     <div class="flex flex-col md:flex-row items-start gap-12 max-w-7xl mx-auto">
 
-        <div class="flex flex-col items-center w-full md:w-1/3 shrink-0">
+        <div class="flex flex-col items-center w-full md:w-1/3 shrink-0 text-white">
             
             <img
                 src={game.coverPath || "../placeholder.avif"}
@@ -109,32 +112,22 @@
 
         </div>
 
-        <div class="w-full md:w-2/3 overflow-x-auto">
-            
-            <Table hoverable={true} class="w-full text-left">
-                <TableHead>
-                    <TableHeadCell>ID</TableHeadCell>
-                    <TableHeadCell>Start Date</TableHeadCell>
-                    <TableHeadCell>End Date</TableHeadCell>
-                    <TableHeadCell>Start Time</TableHeadCell>
-                    <TableHeadCell>End Time</TableHeadCell>
-                    <TableHeadCell>Duration</TableHeadCell>
-                </TableHead>
+        <div class="w-full md:w-2/3 overflow-x-auto text-blue-500">
+            <Tabs tabStyle="underline" classes={{ content:"bg-primary!", divider: "bg-blue-500!"} }>
                 
-                <TableBody>
-                    {#each gameSessions as session}
-                        <TableBodyRow class="bg-primary! border-blue-500! hover:bg-gray-800! cursor-pointer transition-colors">
-                            <TableBodyCell>{session.sessionId}</TableBodyCell>
-                            <TableBodyCell>{formatDate(session.startTs)}</TableBodyCell>
-                            <TableBodyCell>{formatDate(session.endTs)}</TableBodyCell>
-                            <TableBodyCell>{formatTime(session.startTs)}</TableBodyCell>
-                            <TableBodyCell>{formatTime(session.endTs)}</TableBodyCell>
-                            <TableBodyCell>{formatDuration(session.durationSeconds)}</TableBodyCell>
-                        </TableBodyRow>
-                    {/each}
-                </TableBody>
-            </Table>
-            
+                <TabItem title="Sessions" classes={{ button:"cursor-pointer"}}> 
+                    <SessionList {sessions}/>
+                </TabItem>
+                
+                <TabItem title="Timeline" classes={{ button:"cursor-pointer"}}> 
+                    <SessionTimeline {sessions}/>
+                </TabItem>
+                
+                <TabItem title="Stats" classes={{ button:"cursor-pointer"}}>
+                    <Stats {sessions}/>
+                </TabItem>
+                
+            </Tabs>
         </div>
 
     </div>
