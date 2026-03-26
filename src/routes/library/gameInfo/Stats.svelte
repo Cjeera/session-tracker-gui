@@ -1,16 +1,14 @@
-<script>
-    import {
-        formatDate,
-        formatLocaleDate,
-        formatTime,
-        formatDuration,
-    } from "./timeFormatting.js";
+<script lang="ts">
+    import { formatLocaleDate } from "./timeFormatting.js";
     import { Chart } from "@flowbite-svelte-plugins/chart";
+    import type { Session } from "./types.js";
+    import type { ApexOptions } from "apexcharts";
 
-    let { sessions } = $props();
+    // Sessions prop from gameInfo page.
+    let { sessions }: { sessions: Session[] } = $props();
 
-    function getSessionRange(sessions) {
-        let tally = {};
+    function getSessionRange(sessions: Session[]) {
+        let tally: Record<string, number> = {};
 
         for (const session of sessions) {
             let dateStr = formatLocaleDate(session.startTs)
@@ -26,14 +24,13 @@
    
         let counts = Object.values(tally).slice(-7);
 
-        return {dates, counts};
+        return { dates, counts };
 
     }
 
-    let chartData = $derived(getSessionRange(sessions));
+    let chartData: {dates: string[], counts: number[]} = $derived(getSessionRange(sessions));
 
-    /** @type {import('apexcharts').ApexOptions} */
-    let options = $derived({
+    let options = $derived<ApexOptions>({
         chart: {
             type: "bar",
             height: "300px",
@@ -42,10 +39,10 @@
             {
                 name: "Sessions",
                 data: chartData.counts,
-            },
+            }
         ],
         xaxis: {
-            categories: chartData.dates,
+            categories: chartData.dates
         },
     });
 </script>

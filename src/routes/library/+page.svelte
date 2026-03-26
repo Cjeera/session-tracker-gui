@@ -1,9 +1,10 @@
-<script>
+<script lang="ts">
     import {
         Card,
     } from "flowbite-svelte";
     import { onMount } from "svelte";
     import { invoke } from "@tauri-apps/api/core";
+    import type { Game } from "./gameInfo/types";
 
     // Component state variables
     let errorMsg = $state("");

@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     import { Tabs, TabItem } from "flowbite-svelte";
     import { onMount } from "svelte";
     import { invoke } from "@tauri-apps/api/core";
@@ -9,16 +9,15 @@
     import SessionTimeline from "./SessionTimeline.svelte";
     import Stats from "./Stats.svelte";
     import { formatDuration } from "./timeFormatting";
+    import type { Game, GameStats, Session } from "./types";
 
-    // --- COMPONENT STATE ---
-    
     // Reactively extracts the 'id' parameter from the current URL string.
     let rawId = $derived(page.url.searchParams.get("id"));
     
     // Data stores for the fetched backend information
-    let game = $state({});
-    let gameStats = $state({});
-    let sessions = $state([]);
+    let game = $state<Partial<Game>>({});
+    let gameStats = $state<Partial<GameStats>>({});
+    let sessions = $state<Session[]>([]);
 
     // UI state trackers
     let errorMsg = $state();

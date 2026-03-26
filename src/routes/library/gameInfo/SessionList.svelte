@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     import {
         Table,
         TableBody,
@@ -12,22 +12,28 @@
         formatTime,
         formatDuration,
         formatLocaleDate
-    } from "./timeFormatting.js";
+    } from "./timeFormatting";
+
+    import type { Session } from "./types";
 
     // Sessions prop from gameInfo page.
-    let { sessions } = $props();
+    let { sessions }: { sessions: Session[] } = $props();
 
     // State for the single session view.
-    let session = $state({});
+    let session = $state<Partial<Session>>({});
 
     let selected = $state(false);
 
+    type TableSession = Session & { displayId: number };
+
+    type SortKey = keyof TableSession | "";
+
     // State for the table sorting.
-    let sortKey = $state(null);
-    let sortDirection = $state("asc");
+    let sortKey = $state<SortKey>("");
+    let sortDirection = $state<"asc" | "desc">("asc");
 
     /** Handles the sorting logic when a user clicks a table header. Updates the sort key and toggles the ascending/descending direction.*/
-    function handleSort(key) {
+    function handleSort(key: SortKey) {
         // Checks if the user clicked the column that is already being sorted.
         if (sortKey === key) {
             // Toggles direction to descending if currently ascending.
@@ -36,7 +42,7 @@
             }
             // Disables sorting entirely if already descending.
             else {
-                sortKey = null;
+                sortKey = "";
                 sortDirection = "asc";
             }
         }
@@ -49,7 +55,7 @@
 
     let sortedSessions = $derived.by(() => {
         // add the sequential ID to a copy of the sessions
-        let sessionsWithId = sessions.map((s, i) => ({
+        let sessionsWithId: TableSession[] = sessions.map((s, i) => ({
             ...s,
             displayId: i + 1
         }));
@@ -57,12 +63,12 @@
         // Return early if no sort key
         if (!sortKey) return sessionsWithId;
 
-        const currentKey = sortKey;
+        const currentKey = sortKey as keyof TableSession;
 
         // Sort the new array (using displayId if that's the sortKey)
         return [...sessionsWithId].sort((a, b) => {
-            let valA = a[currentKey];
-            let valB = b[currentKey];
+            let valA = a[currentKey] as any;
+            let valB = b[currentKey] as any;
 
             if (valA < valB) return sortDirection === "asc" ? -1 : 1;
             if (valA > valB) return sortDirection === "asc" ? 1 : -1;
@@ -70,7 +76,7 @@
         });
     });
     /** Opens the detailed view for a specific session.*/
-    function getSingleSession(selectedSession) {
+    function getSingleSession(selectedSession: TableSession) {
         // The clicked session data is assigned to the state object.
         session = selectedSession;
 
@@ -192,31 +198,31 @@
             <div class="flex flex-col">
                 <h2 class="text-2xl font-bold">Start Date</h2>
                 <hr class="w-full mt-1 mb-2 border-gray-600" />
-                <p>{formatDate(session.startTs)}</p>
+                <p>{formatDate(session.startTs!)}</p>
             </div>
 
             <div class="flex flex-col">
                 <h2 class="text-2xl font-bold">End Date</h2>
                 <hr class="w-full mt-1 mb-2 border-gray-600" />
-                <p>{formatDate(session.endTs)}</p>
+                <p>{formatDate(session.endTs!)}</p>
             </div>
 
             <div class="flex flex-col">
                 <h2 class="text-2xl font-bold">Start Time</h2>
                 <hr class="w-full mt-1 mb-2 border-gray-600" />
-                <p>{formatTime(session.startTs)}</p>
+                <p>{formatTime(session.startTs!)}</p>
             </div>
 
             <div class="flex flex-col">
                 <h2 class="text-2xl font-bold">End Time</h2>
                 <hr class="w-full mt-1 mb-2 border-gray-600" />
-                <p>{formatTime(session.endTs)}</p>
+                <p>{formatTime(session.endTs!)}</p>
             </div>
 
             <div class="flex flex-col">
                 <h2 class="text-2xl font-bold">Duration</h2>
                 <hr class="w-full mt-1 mb-2 border-gray-600" />
-                <p>{formatDuration(session.durationSeconds)}</p>
+                <p>{formatDuration(session.durationSeconds!)}</p>
             </div>
         </div>
 
