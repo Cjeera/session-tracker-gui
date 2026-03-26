@@ -25,6 +25,7 @@
     }
   },
   "bundle": {
+    "createUpdaterArtifacts": true,
     "active": true,
     "targets": "all",
     "icon": [
@@ -34,5 +35,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDExMjVEMzdBN0E2REVERjEKUldUeDdXMTZldE1sRVVOc0p5ek9LQnZqenBaZUl5NzhrU05FZHBnajdJeEhEUGJ0MVdoUFo4WDcK",
+      "endpoints": [
+        "https://github.com/Cjeera/session-tracker-gui/releases/latest/download/latest.json"
+      ]
+    }
   }
 }

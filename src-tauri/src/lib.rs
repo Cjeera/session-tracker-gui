@@ -80,9 +80,26 @@ async fn end_tracker(session_notes: &str, session_data: SessionRust) -> Result<(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    #[cfg(desktop)]
+    {
+        builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    }
+
+    builder
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![start_tracker, end_tracker, search_processes, get_game_list, get_game_stats, get_game_sessions, get_single_game])
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_process::init())
+        .invoke_handler(tauri::generate_handler![
+            start_tracker, 
+            end_tracker, 
+            search_processes, 
+            get_game_list, 
+            get_game_stats, 
+            get_game_sessions, 
+            get_single_game
+        ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
