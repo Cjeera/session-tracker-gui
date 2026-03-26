@@ -11,7 +11,7 @@
         formatDate,
         formatTime,
         formatDuration,
-        formatLocaleDate
+        formatLocaleDate,
     } from "./timeFormatting";
 
     import type { Session } from "./types";
@@ -57,7 +57,7 @@
         // add the sequential ID to a copy of the sessions
         let sessionsWithId: TableSession[] = sessions.map((s, i) => ({
             ...s,
-            displayId: i + 1
+            displayId: i + 1,
         }));
 
         // Return early if no sort key
@@ -86,7 +86,11 @@
 </script>
 
 <!--Displays the session list view if selected if false, meaning user hasn't selected an individual session-->
-{#if !selected}
+{#if sessions.length === 0}
+    <h5 class="pb-1 text-2xl leading-none font-bold text-white">
+        No Sessions Recorded Yet!
+    </h5>
+{:else if !selected}
     <Table
         hoverable={true}
         classes={{
@@ -94,7 +98,7 @@
         }}
         class="w-full text-left"
     >
-    <!-- Displays the table headers, displaying an arrow next to them depending on sort state-->
+        <!-- Displays the table headers, displaying an arrow next to them depending on sort state-->
         <TableHead>
             <TableHeadCell
                 onclick={() => handleSort("displayId")}
@@ -164,25 +168,33 @@
         </TableHead>
 
         <TableBody>
-        <!--Displays every entry in sortedSessions as a row-->
+            <!--Displays every entry in sortedSessions as a row-->
             {#each sortedSessions as session}
-            <!--If user clicks on a session row, getSingleSession is called-->
+                <!--If user clicks on a session row, getSingleSession is called-->
                 <TableBodyRow
                     class="bg-primary! border-b border-blue-500! hover:bg-gray-800! cursor-pointer transition-colors"
                     onclick={() => getSingleSession(session)}
                 >
                     <TableBodyCell>{session.displayId}</TableBodyCell>
 
-                    <TableBodyCell>{formatLocaleDate(session.startTs)}</TableBodyCell>
-                    <TableBodyCell>{formatLocaleDate(session.endTs)}</TableBodyCell>
+                    <TableBodyCell
+                        >{formatLocaleDate(session.startTs)}</TableBodyCell
+                    >
+                    <TableBodyCell
+                        >{formatLocaleDate(session.endTs)}</TableBodyCell
+                    >
                     <TableBodyCell>{formatTime(session.startTs)}</TableBodyCell>
                     <TableBodyCell>{formatTime(session.endTs)}</TableBodyCell>
-                    <TableBodyCell>{formatDuration(session.durationSeconds)}</TableBodyCell>
+                    <TableBodyCell
+                        >{formatDuration(
+                            session.durationSeconds,
+                        )}</TableBodyCell
+                    >
                 </TableBodyRow>
             {/each}
         </TableBody>
     </Table>
-<!--Displays the details of single session-->
+    <!--Displays the details of single session-->
 {:else}
     <div class="mb-6">
         <button
