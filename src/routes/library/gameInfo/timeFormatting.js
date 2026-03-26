@@ -1,6 +1,12 @@
 export function formatDate(timestampString) {
     const date = new Date(timestampString);
-    
+
+    return date.toDateString();
+}
+
+export function formatLocaleDate(timestampString) {
+    const date = new Date(timestampString);
+
     return date.toLocaleDateString();
 }
 
