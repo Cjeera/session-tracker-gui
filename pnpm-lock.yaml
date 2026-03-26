@@ -36,6 +36,9 @@ importers:
       '@tauri-apps/cli':
         specifier: ^2
         version: 2.9.6
+      apexcharts:
+        specifier: ^5.10.4
+        version: 5.10.4
       flowbite:
         specifier: ^4.0.1
         version: 4.0.1(rollup@4.57.0)
@@ -767,8 +770,8 @@ packages:
   apexcharts@4.7.0:
     resolution: {integrity: sha512-iZSrrBGvVlL+nt2B1NpqfDuBZ9jX61X9I2+XV0hlYXHtTwhwLTHDKGXjNXAgFBDLuvSYCB/rq2nPWVPRv2DrGA==}
 
-  apexcharts@5.5.1:
-    resolution: {integrity: sha512-fIJSzME9V0Ksfzk4x8CGMcK6HGLaRonxL7V7+7gHl4alAQBm4O/7D/3bM4F/MLmOakhkOs/RZbwYwLJDbAFzGw==}
+  apexcharts@5.10.4:
+    resolution: {integrity: sha512-gt0VUqZ2+mr25ScbUcKZgJr96jKYm4vjOcxEWCEh/E5F4dWqhyo3dBhPRvNNnkKiWxkMd2cBwj3ZYH3rK39fkA==}
 
   aria-query@5.3.2:
     resolution: {integrity: sha512-COROpnaoap1E2F000S62r6A60uHZnmlvomhfyT2DlTcrY1OrBKn2UhH7qn5wTC9zMvD0AY7csdPSNwKP+7WiQw==}
@@ -1780,9 +1783,7 @@ snapshots:
       '@svgdotjs/svg.select.js': 4.0.3(@svgdotjs/svg.js@3.2.5)
       '@yr/monotone-cubic-spline': 1.0.3
 
-  apexcharts@5.5.1:
-    dependencies:
-      '@yr/monotone-cubic-spline': 1.0.3
+  apexcharts@5.10.4: {}
 
   aria-query@5.3.2: {}
 
@@ -1875,7 +1876,7 @@ snapshots:
     dependencies:
       '@floating-ui/dom': 1.7.5
       '@floating-ui/utils': 0.2.10
-      apexcharts: 5.5.1
+      apexcharts: 5.10.4
       clsx: 2.1.1
       date-fns: 4.1.0
       esm-env: 1.2.2
