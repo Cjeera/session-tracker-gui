@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
   import "../app.css";
   import {
     FloatingLabelInput,
@@ -22,7 +22,7 @@
   import { onDestroy } from 'svelte';
 
   onDestroy(() => {
-		tracker.resultMsg = "";
+		tracker.errorMsg = "";
     tracker.successMsg = "";
 	});
 </script>
@@ -51,7 +51,7 @@
       <div class="min-h-4 items-end">
         {#if tracker.errorFlag}
           <Helper color="red">
-            <span class="font-medium text-left">{tracker.resultMsg}</span>
+            <span class="font-medium text-left">{tracker.errorMsg}</span>
           </Helper>
         {/if}
       </div>
@@ -70,7 +70,7 @@
           </TableHead>
           <TableBody class="cursor-pointer">
             {#each tracker.searchResults as process}
-              <TableBodyRow onclick={() => tracker.trackSession({pid: process.pid, processName: process.name})} class="bg-primary! border-blue-500! hover:bg-gray-800! cursor-pointer transition-colors">
+              <TableBodyRow onclick={() => tracker.trackSession({pid: process.pid, name: process.name})} class="bg-primary! border-blue-500! hover:bg-gray-800! cursor-pointer transition-colors">
                 <TableBodyCell>{process.pid}</TableBodyCell>
                 <TableBodyCell>{process.name}</TableBodyCell>
               </TableBodyRow>

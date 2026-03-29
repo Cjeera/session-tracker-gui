@@ -4,11 +4,11 @@
     } from "flowbite-svelte";
     import { onMount } from "svelte";
     import { invoke } from "@tauri-apps/api/core";
-    import type { Game } from "./gameInfo/types";
+    import type { Game } from "$lib/types";
 
     // Component state variables
     let errorMsg = $state("");
-    let games = $state([]);
+    let games = $state<Game[]>([]);
     let success = $state(false);
 
     /** * Fetches the user's game library from the Tauri backend.
@@ -28,7 +28,7 @@
             success = true;
         } catch (error) {
             // Capture and log any errors that occur during the fetch
-            errorMsg = error;
+            errorMsg = String(error);
             console.error("Failed to load games:", error);
         }
     }

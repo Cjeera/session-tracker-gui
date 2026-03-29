@@ -9,6 +9,10 @@ const config = {
   kit: {
     adapter: adapter({
       fallback: "index.html",
+      adapter: adapter(),
+      alias: {
+        $dir: "./src/lib"
+      }
     }),
   },
 };

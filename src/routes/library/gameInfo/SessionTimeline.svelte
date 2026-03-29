@@ -1,5 +1,5 @@
-<script>
-    import { formatDate } from "./timeFormatting";
+<script lang="ts">
+    import { formatDate } from "$lib/timeFormatting";
     import { Timeline, TimelineItem} from "flowbite-svelte";
 
     // Sessions prop from gameInfo page.

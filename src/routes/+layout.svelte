@@ -16,9 +16,7 @@
         try {
             const update = await check();
             
-            if (update) {
-                console.log(`Found update ${update.version}`);
-                
+            if (update) {                
                 const wantsToUpdate = await ask(
                     `Version ${update.version} is available!\n\nRelease notes:\n${update.body}\n\nWould you like to install it now?`, 
                     {

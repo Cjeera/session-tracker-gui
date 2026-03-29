@@ -8,8 +8,8 @@
     import SessionList from "./SessionList.svelte";
     import SessionTimeline from "./SessionTimeline.svelte";
     import Stats from "./Stats.svelte";
-    import { formatDuration } from "./timeFormatting";
-    import type { Game, GameStats, Session } from "./types";
+    import { formatDuration } from "$lib/timeFormatting";
+    import type { Game, GameStats, Session } from "../../../lib/types";
 
     // Reactively extracts the 'id' parameter from the current URL string.
     let rawId = $derived(page.url.searchParams.get("id"));

@@ -12,9 +12,9 @@
         formatTime,
         formatDuration,
         formatLocaleDate,
-    } from "./timeFormatting";
+    } from "$lib/timeFormatting";
 
-    import type { Session } from "./types";
+    import type { Session } from "$lib/types";
 
     // Sessions prop from gameInfo page.
     let { sessions }: { sessions: Session[] } = $props();

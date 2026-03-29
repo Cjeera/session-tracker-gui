@@ -1,7 +1,7 @@
 <script lang="ts">
-    import { formatDuration, formatLocaleDate, formatTime } from "./timeFormatting.js";
+    import { formatDuration, formatLocaleDate, formatTime } from "$lib/timeFormatting.js";
     import { Chart } from "@flowbite-svelte-plugins/chart";
-    import type { Session } from "./types.js";
+    import type { Session } from "$lib/types";
     import type { ApexOptions } from "apexcharts";
 
     // Sessions prop from gameInfo page.

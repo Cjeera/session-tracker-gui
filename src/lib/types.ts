@@ -6,6 +6,14 @@ export interface Session {
         notes: string;
     }
 
+export interface SessionRust {
+        game: string;
+        startTs: string;
+        endTs: string;
+        durationSeconds: number
+        notes: string;
+    }
+
 export interface Game {
         gameId: number;
         title: string;
@@ -17,4 +25,9 @@ export interface GameStats {
         totalPlaytime: number;
         totalSessions: number;
         lastPlayed: string;
+    }
+
+export interface Process {
+        pid: number;
+        name: string;
     }
