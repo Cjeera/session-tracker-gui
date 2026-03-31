@@ -34,6 +34,12 @@
     <h2 class="text-4xl font-bold mb-8 text-center">{tracker.headerMessage}</h2>
     {#if tracker.gameFound}
       <h3 class="text-2xl font-bold mb-4">{tracker.stopwatchDisplay}</h3>
+      {#if tracker.paused}
+        <h4 class="text-2xl font-bold mb-4">Session Paused!</h4>
+        <Button onclick={tracker.resumeSession} outline color="blue" class="mt-4 cursor-pointer transition-colors">Resume</Button>
+      {:else if !tracker.paused}
+        <Button onclick={tracker.pauseSession} outline color="blue" class="mt-4 cursor-pointer transition-colors">Pause</Button>
+      {/if}
     {:else if !tracker.gameFound}
       <FloatingLabelInput
         class="w-96"

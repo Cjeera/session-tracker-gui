@@ -6,7 +6,12 @@ pub mod csv_fallback;
 use crate::session_tracker::{track_session, end_session, process_search, Process};
 use crate::database_operations::{get_games, get_stats, get_sessions, get_game_by_id, Session, SessionRust, Game, GameStats};
 use crate::error::AppError;
-use tauri::AppHandle;
+use tauri::{AppHandle, Builder, Manager};
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+
+pub struct PauseState {
+  paused: Arc<AtomicBool>,
+}
 
 #[tauri::command]
 async fn get_game_list() -> Result<Vec<Game>, AppError>
@@ -63,11 +68,31 @@ async fn search_processes(game_input: String) -> Result<Vec<Process>, AppError>
 #[tauri::command]
 async fn start_tracker(game_input: String, pid: u32, app: AppHandle) -> Result<SessionRust, AppError>
 {
-    match track_session(&game_input, pid, app)
+    let pause_state = app.state::<PauseState>().paused.clone();
+    pause_state.store(false, Ordering::Relaxed);
+    match track_session(&game_input, pid, app.clone(), pause_state)
     {
         Ok(session_data) => Ok(session_data),
         Err(error) => Err(error),
     }
+}
+
+#[tauri::command]
+async fn toggle_pause(app: AppHandle) -> Result<(), AppError>
+{
+    let pause_state = app.state::<PauseState>().paused.clone();
+    pause_state.store(true, Ordering::Relaxed);
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn toggle_resume(app: AppHandle) -> Result<(), AppError>
+{
+    let pause_state = app.state::<PauseState>().paused.clone();
+    pause_state.store(false, Ordering::Relaxed);
+
+    Ok(())
 }
 
 /// Takes frontend input (session_notes) and the session_data struct and sends it to end_session function.
@@ -80,7 +105,7 @@ async fn end_tracker(session_notes: &str, session_data: SessionRust) -> Result<(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let mut builder = tauri::Builder::default();
+    let mut builder = Builder::default();
 
     #[cfg(desktop)]
     {
@@ -98,8 +123,18 @@ pub fn run() {
             get_game_list, 
             get_game_stats, 
             get_game_sessions, 
-            get_single_game
+            get_single_game,
+            toggle_pause,
+            toggle_resume,
         ])
+        .setup(|app| 
+        {
+            app.manage(PauseState 
+            {
+                paused: Arc::new(AtomicBool::new(false)),
+            });
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

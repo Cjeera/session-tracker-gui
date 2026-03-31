@@ -23,7 +23,7 @@ pub enum AppError
     Message(String),
 
     #[error("No Game Found!")]
-    NotFound()
+    NotFound(),
 }
 
 impl Serialize for AppError

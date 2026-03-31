@@ -10,6 +10,7 @@ use std::time::Instant;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
 use std::path::PathBuf;
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -105,7 +106,7 @@ fn stopwatch_tick(app: &AppHandle, stopwatch: &StopwatchImpl<Instant>)
         elapsed_ms: stopwatch.elapsed().as_millis(),
     };
 
-    // The payload struct is sent to the frontend.
+    // The payload struct with the elapsed time is sent to the frontend.
     app.emit("stopwatch-tick", payload).unwrap();
 }
 
@@ -121,12 +122,14 @@ fn stopwatch_stop(app: &AppHandle, stopwatch: &mut StopwatchImpl<Instant>)
         elapsed_ms: stopwatch.elapsed().as_millis(),
     };
 
+    let _ = stopwatch.reset();
+
     // The payload struct is sent to the frontend.
     app.emit("stopwatch-tick", payload).unwrap();
 }
 
 /// Tracks a running application's session time. Returns a struct containing session data.
-pub fn track_session(game_input: &String, pid: u32, app: AppHandle) -> Result<SessionRust, AppError>
+pub fn track_session(game_input: &String, pid: u32, app: AppHandle, pause: Arc<AtomicBool>) -> Result<SessionRust, AppError>
 {
     // Gets a list of all running processes.
     let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()));
@@ -151,6 +154,7 @@ pub fn track_session(game_input: &String, pid: u32, app: AppHandle) -> Result<Se
         let mut stopwatch = Sw::new_started();
 
         let pid = Pid::from_u32(pid);
+
         loop 
         {
             thread::sleep(sleep_time);
@@ -160,21 +164,38 @@ pub fn track_session(game_input: &String, pid: u32, app: AppHandle) -> Result<Se
                 break;
             }
 
-            stopwatch_tick(&app, &stopwatch);        
+            if pause.load(Ordering::Relaxed)
+            {
+                if !stopwatch.is_stopped()
+                {
+                    let _ = stopwatch.stop();
+                }
+            }
+            else 
+            {
+                if stopwatch.is_stopped()
+                {
+                    let _ = stopwatch.start();
+                }
+                
+                stopwatch_tick(&app, &stopwatch);     
+            }
         }
 
         // Once the application is exited, the stopwatch is stopped.
         stopwatch_stop(&app, &mut stopwatch);
+
+        stopwatch.elapsed().as_millis()
     });
 
     // Rust waits for the thread to finish, meaning the game has been exited.
-    let _ = tracker_thread.join();
+    let stopwatch_elapsed = tracker_thread.join().unwrap_or_default();
 
     // End timestamp is taken.
     let end = Utc::now();
 
     // The duration between the start and end in seconds is calculated.
-    let duration_seconds = (end - start).num_seconds().max(0);
+    let duration_seconds = (stopwatch_elapsed / 1000) as i64;
 
     // The data is gathered into the session_data struct.
     let session_data = SessionRust

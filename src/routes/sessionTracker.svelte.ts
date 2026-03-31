@@ -23,6 +23,7 @@ class SessionTracker {
     sessionNotes = $state("");
     successMsg = $state("");
     gameFound = $state(false);
+    paused = $state(false);
 
     sessionData = $state<Partial<SessionRust>>({});
     errorMsg = $state("");
@@ -63,9 +64,9 @@ class SessionTracker {
     }
 
     trackSession = async (process: Process) => {
-        this.pid = process.pid;
-        
-        // Bug fix: Your types.ts file defines this as 'name', not 'processName'
+        this.paused = false;
+        this.pid = process.pid
+            
         this.gameInput = process.name; 
 
         this.searchSuccessful = false;
@@ -95,8 +96,25 @@ class SessionTracker {
             this.headerMessage = "Session ended!";
         } catch (error) {
             this.errorMsg = String(error);
-            console.error(error);
         }
+    }
+
+    pauseSession = async (event: Event) => {
+        try {
+            invoke("toggle_pause")
+            this.paused = true;
+        } catch (error) {
+            this.errorMsg = String(error)
+        }   
+    }
+
+    resumeSession = async (event: Event) => {
+        try {
+            invoke("toggle_resume")
+            this.paused = false;
+        } catch (error) {
+            this.errorMsg = String(error)
+        }   
     }
 
     endSession = async (event: Event) => {
@@ -126,6 +144,7 @@ class SessionTracker {
             this.headerMessage = "Enter a game title to get started";
             this.gameFound = false;
             this.searchResults = [];
+            this.paused = false;
 
         } catch (error) {
             this.errorMsg = String(error);
