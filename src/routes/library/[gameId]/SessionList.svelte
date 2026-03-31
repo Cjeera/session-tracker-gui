@@ -195,7 +195,7 @@
         </TableBody>
     </Table>
     <!--Displays the details of single session-->
-{:else}
+{:else if selected}
     <div class="mb-6">
         <button
             class="text-blue-500 hover:text-blue-400 underline cursor-pointer"
