@@ -48,7 +48,7 @@
         {:else}
             {#each games as game}
                 <Card
-                    href={`/library/gameInfo?id=${game.gameId}`}
+                    href="/library/{game.gameId}/"
                     class="cursor-pointer relative overflow-hidden group border-none shadow-lg"
                 >
                     <img

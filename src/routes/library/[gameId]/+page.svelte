@@ -9,10 +9,15 @@
     import SessionTimeline from "./SessionTimeline.svelte";
     import Stats from "./Stats.svelte";
     import { formatDuration } from "$lib/timeFormatting";
-    import type { Game, GameStats, Session } from "../../../lib/types";
+    import type { Game, GameStats, Session } from "$lib/types";
 
-    // Reactively extracts the 'id' parameter from the current URL string.
-    let rawId = $derived(page.url.searchParams.get("id"));
+    interface RouteParams {
+        gameId: string;
+    }
+
+    let params = $derived(page.params as unknown as RouteParams);
+
+    let rawId = $derived(params.gameId);
     
     // Data stores for the fetched backend information
     let game = $state<Partial<Game>>({});
