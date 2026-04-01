@@ -3,14 +3,14 @@ use crate::database_operations::{insert_data, open_connection, SessionRust};
 use chrono::{Utc};
 use serde::Serialize;
 use std::{thread, time};
+use std::path::Path;
+use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
 use tauri::{AppHandle, Emitter};
 use libsw::{Sw, StopwatchImpl};
 use std::time::Instant;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
-use std::path::PathBuf;
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -31,7 +31,7 @@ struct StopwatchPayload
 fn normalize(string: &str) -> String
 {
     // Makes a PathBuf from string.
-    let string_path = PathBuf::from(string);
+    let string_path = Path::new(string);
 
     // Non extension portion of string_path is taken, then converted to string and returned.
     string_path.file_stem().unwrap_or_default().to_str().unwrap_or_default().to_string()
@@ -129,7 +129,7 @@ fn stopwatch_stop(app: &AppHandle, stopwatch: &mut StopwatchImpl<Instant>) -> Re
 }
 
 /// Tracks a running application's session time. Returns a struct containing session data.
-pub fn track_session(game_input: &String, pid: u32, app: AppHandle, pause: Arc<AtomicBool>) -> Result<SessionRust, AppError>
+pub fn track_session(game_input: &str, pid: u32, app: AppHandle, pause: Arc<AtomicBool>) -> Result<SessionRust, AppError>
 {
     // Gets a list of all running processes.
     let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()));

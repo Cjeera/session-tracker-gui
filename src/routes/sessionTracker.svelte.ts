@@ -46,9 +46,9 @@ class SessionTracker {
         this.successMsg = "";
         this.searchSuccessful = false;
 
-        if (this.gameInput.length <= 2) {
+        if (this.gameInput.length <= 1) {
             this.errorFlag = true;
-            this.errorMsg = "Enter a name at least 3 characters long";
+            this.errorMsg = "Enter a name at least 2 characters long";
             return;
         }
 
@@ -75,6 +75,10 @@ class SessionTracker {
 
         this.headerMessage = "Currently Tracking " + this.gameInput + "\n(PID " + this.pid +")";
 
+        if (this.unlistenStopwatch) {
+            this.unlistenStopwatch();
+        }
+
         this.unlistenStopwatch = await listen<{ elapsedMs: number }>("stopwatch-tick", (event) => {
             this.StopwatchPayload.elapsedMs = event.payload.elapsedMs;
             let totalSeconds = Math.floor(this.StopwatchPayload.elapsedMs / 1000);
@@ -99,18 +103,18 @@ class SessionTracker {
         }
     }
 
-    pauseSession = async (event: Event) => {
+    pauseSession = async () => {
         try {
-            invoke("toggle_pause")
+            await invoke("toggle_pause")
             this.paused = true;
         } catch (error) {
             this.errorMsg = String(error)
         }   
     }
 
-    resumeSession = async (event: Event) => {
+    resumeSession = async () => {
         try {
-            invoke("toggle_resume")
+            await invoke("toggle_resume")
             this.paused = false;
         } catch (error) {
             this.errorMsg = String(error)

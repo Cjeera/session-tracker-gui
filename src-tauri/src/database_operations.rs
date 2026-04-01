@@ -238,7 +238,7 @@ pub fn insert_data(conn: &Connection, session_data: SessionRust) -> Result<(), A
         return Err(AppError::Message("Duration cannot be negative!".to_string()))
     }
 
-    create_tables(&conn)?;
+    create_tables(conn)?;
 
     let start_str = session_data.start_ts.to_rfc3339();
     let end_str = session_data.end_ts.to_rfc3339();
