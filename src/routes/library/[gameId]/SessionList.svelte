@@ -240,7 +240,7 @@
 
         <div>
             <h2 class="text-2xl font-bold">Session Notes:</h2>
-            <p class="mt-2 text-lg text-gray-300">
+            <p class="mt-2 text-lg text-gray-300 whitespace-pre-wrap">
                 {session.notes || "No session notes available."}
             </p>
         </div>
