@@ -43,9 +43,11 @@
     <div
         class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6 justify-center items-center"
     >
+        <!--Displays message if no games are found-->
         {#if !success}
-            <h1>Games not found!</h1>
+            <h1>No Games Found!</h1>
         {:else}
+        <!--LIBRARY DISPLAY SECTION-->
             {#each games as game}
                 <Card
                     href="/library/{game.gameId}/"

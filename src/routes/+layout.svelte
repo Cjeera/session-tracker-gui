@@ -16,7 +16,8 @@
         try {
             const update = await check();
             
-            if (update) {                
+            if (update) {
+                // Dialogue box is displayed for the user to update the app.                
                 const wantsToUpdate = await ask(
                     `Version ${update.version} is available!\n\nRelease notes:\n${update.body}\n\nWould you like to install it now?`, 
                     {
@@ -42,6 +43,7 @@
     });
 </script>
 
+<!--NAVIGATION BAR-->
 <Navbar fluid={true}>
     <NavBrand href="/">
         <span class="self-center whitespace-nowrap text-xl font-semibold text-white">Session Tracker GUI</span>

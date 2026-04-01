@@ -3,8 +3,8 @@ import { invoke } from "@tauri-apps/api/core";
 import type { UnlistenFn } from "@tauri-apps/api/event";
 import type { SessionRust, Process } from "$lib/types";
 
+// A class containing all session tracking logic.
 class SessionTracker {
-    // Explicitly type the unlisten function
     unlistenStopwatch: UnlistenFn | null = null;
 
     // Seconds, minutes and hours, which will be formatted into HH:MM:SS.
@@ -12,79 +12,95 @@ class SessionTracker {
     minutes = $state(0);
     hours = $state(0);
 
+    // The stopwatch that will display once tracking begins.
     stopwatchDisplay = $state("Elapsed Time: 00:00:00");
 
+    // A process array that search results will be stored in.
     searchResults = $state<Process[]>([]);
 
-    gameInput = $state("");
-    errorFlag = $state(false);
+    gameInput = $state("");  
     headerMessage = $state("Enter a game title to get started");
     newGameInput = $state("");
     sessionNotes = $state("");
     successMsg = $state("");
+    errorMsg = $state("");
+
+    errorFlag = $state(false);
     gameFound = $state(false);
     paused = $state(false);
+    searchSuccessful = $state(false);
 
     sessionData = $state<Partial<SessionRust>>({});
-    errorMsg = $state("");
     pid = $state(0);
 
     StopwatchPayload = $state({
         elapsedMs: 0,
     });
 
-    searchSuccessful = $state(false);
-
     searchProcesses = async (event: Event) => {
         event.preventDefault();
 
-        this.errorFlag = false;
-        
+        // Error flag, search results, stopwatch, success message and search successful are reset.
+        this.errorFlag = false;      
         this.searchResults = [];
-
         this.stopwatchDisplay = "Elapsed Time: 00:00:00";
         this.successMsg = "";
         this.searchSuccessful = false;
 
+        // Forbids game inputs equal to or less than 1. 
         if (this.gameInput.length <= 1) {
             this.errorFlag = true;
             this.errorMsg = "Enter a name at least 2 characters long";
             return;
         }
 
+        // Calls the search_processes backend function, sending gameInput as an argument.
         try {
             this.searchResults = await invoke<Process[]>("search_processes", { gameInput: this.gameInput });
             this.searchSuccessful = true;
         } catch (error) {
             this.errorFlag = true;
-            // Cast unknown catch errors to string
             this.errorMsg = String(error);
             console.error(error);
         }
     }
 
     trackSession = async (process: Process) => {
-        this.paused = false;
-        this.pid = process.pid
-            
-        this.gameInput = process.name; 
 
+        this.paused = false;
         this.searchSuccessful = false;
         this.errorFlag = false;
         this.gameFound = true;
 
+        this.pid = process.pid      
+        this.gameInput = process.name; 
+
+        // Changes the header message.
         this.headerMessage = "Currently Tracking " + this.gameInput + "\n(PID " + this.pid +")";
 
+        // Backend stopwatch is reset
         if (this.unlistenStopwatch) {
             this.unlistenStopwatch();
         }
 
+        // A listener is set up which will get the elapsed time in ms.
         this.unlistenStopwatch = await listen<{ elapsedMs: number }>("stopwatch-tick", (event) => {
+            // Payload is recieved from the backend.
             this.StopwatchPayload.elapsedMs = event.payload.elapsedMs;
+
+            // Calculates total seconds.
             let totalSeconds = Math.floor(this.StopwatchPayload.elapsedMs / 1000);
+
+            // Calculates hours.
             this.hours = Math.floor(totalSeconds / 3600);
+
+            // Calculates minutes.
             this.minutes = Math.floor(totalSeconds / 60) % 60;
+
+            // Calculates seconds.
             this.seconds = Math.floor(totalSeconds % 60);
+
+            // Formats into HH:MM:SS.
             this.stopwatchDisplay =
                 "Elapsed Time:\n" +
                 String(this.hours).padStart(2, "0") +
@@ -94,6 +110,7 @@ class SessionTracker {
                 String(this.seconds).padStart(2, "0");
         });
 
+        // Calls start_tracker backend function, sending gameInput, gameInput and pid as arguments.
         try {
             const result = await invoke<SessionRust>("start_tracker", { gameInput: this.gameInput, pid: this.pid });
             this.sessionData = result;
@@ -104,6 +121,7 @@ class SessionTracker {
     }
 
     pauseSession = async () => {
+        // Calls toggle_pause backend function.
         try {
             await invoke("toggle_pause")
             this.paused = true;
@@ -113,6 +131,7 @@ class SessionTracker {
     }
 
     resumeSession = async () => {
+        // Calls toggle_resume backend function.
         try {
             await invoke("toggle_resume")
             this.paused = false;
@@ -124,21 +143,25 @@ class SessionTracker {
     endSession = async (event: Event) => {
         event.preventDefault();
 
+        // Stops the stopwatch.
         if (this.unlistenStopwatch) {
             this.unlistenStopwatch();
             this.unlistenStopwatch = null;
         }
 
+        // If the user entered a new game title, assigns it to sessionData.game.
         if (this.newGameInput.trim().length > 0) {
             this.sessionData.game = this.newGameInput;
         }
 
         try {
+            // Calls end_tracker backend function, sending sessionNotes and sessionData as arguments.
             await invoke("end_tracker", {
                 sessionNotes: this.sessionNotes,
                 sessionData: this.sessionData
             });
 
+            // Success message is displayed.
             this.successMsg = "Session data saved to database!";
 
             this.sessionData = {};
@@ -156,4 +179,5 @@ class SessionTracker {
     }
 }
 
+// tracker is exported for use as an instance of SessionTracker.
 export const tracker = new SessionTracker();

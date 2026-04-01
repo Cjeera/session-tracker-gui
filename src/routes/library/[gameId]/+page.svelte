@@ -15,8 +15,8 @@
         gameId: string;
     }
 
+    // The game id passed from the library page.
     let params = $derived(page.params as unknown as RouteParams);
-
     let rawId = $derived(params.gameId);
     
     // Data stores for the fetched backend information
@@ -97,6 +97,7 @@
 <main class="min-h-screen p-8">
     <div class="flex flex-col md:flex-row items-start gap-12 max-w-7xl mx-auto">
 
+        <!--GAME INFO DISPAY SECTION-->
         <div class="flex flex-col items-center w-full md:w-1/3 shrink-0 text-white">
             
             <img
@@ -116,11 +117,13 @@
 
         </div>
 
+        <!--TABS BAR SECTION-->
         <div class="w-full md:w-2/3 overflow-x-auto text-blue-500">
             <Tabs tabStyle="underline" classes={{ content:"bg-primary!", divider: "bg-blue-500!"} }>
                 
+                <!--The tab items are imported components to reduce clutter-->
                 <TabItem title="Sessions" classes={{ button:"cursor-pointer"}}> 
-                    <SessionList {sessions}/>
+                    <SessionList bind:sessions/>
                 </TabItem>
                 
                 <TabItem title="Timeline" classes={{ button:"cursor-pointer"}}> 
@@ -133,6 +136,5 @@
                 
             </Tabs>
         </div>
-
     </div>
 </main>

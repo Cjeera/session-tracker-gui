@@ -16,27 +16,32 @@
     } from "$lib/timeFormatting";
 
     import type { Session } from "$lib/types";
-
     import { invoke } from "@tauri-apps/api/core";
 
     // Sessions prop from gameInfo page.
-    let { sessions }: { sessions: Session[] } = $props();
+    let { sessions = $bindable() }: { sessions: Session[] } = $props();
 
     // State for the single session view.
     let session = $state<Partial<Session>>({});
 
+    // State for single session view display.
     let selected = $state(false);
 
+    // State for edit notes display.
     let editNotesFlag = $state(false);
 
+    // State for the updated session notes.
     let updatedNotes = $state("");
 
+    // State for success messages for editNotes.
     let successMsg = $state("");
 
+    // State for error messages for editNotes.
     let errorMsg = $state("");
 
     type TableSession = Session & { displayId: number };
 
+    // Key that identifies what column is being sorted.
     type SortKey = keyof TableSession | "";
 
     // State for the table sorting.
@@ -64,6 +69,7 @@
         }
     }
 
+    // A new sessions list is created with IDs starting from 1.
     let sortedSessions = $derived.by(() => {
         // add the sequential ID to a copy of the sessions
         let sessionsWithId: TableSession[] = sessions.map((s, i) => ({
@@ -95,26 +101,31 @@
         selected = true;
     }
 
+    /** Function for editing session notes*/
     async function editNotes(sessionId: number, updatedNotes: string) {
         errorMsg = "";
+
         try {
+            // Backend function is called with sessionId and updatedNotes sent as arguments.
             await invoke("edit_notes", {sessionId, updatedNotes})
 
+            // Session notes from the single session is updated with the new notes.
             session.notes = updatedNotes;
 
+            // The original sessions list is updated with the new notes.
             const index = sessions.findIndex(s => s.sessionId === sessionId);
             if (index !== -1) {
                 sessions[index].notes = updatedNotes;
             }
 
+            // Success message is displayed to the user.
             successMsg = "Updated Notes Successfully!";
 
+            // Error message is emptied.
             errorMsg = "";
 
+            // Edit notes flag set to false, will cause edit notes text area to dissapear.
             editNotesFlag = false;
-
-            console.log(session.notes)
-
         } catch (error) {
             errorMsg = "database error!"
 
@@ -249,30 +260,35 @@
     <!--Displays the details of single session-->
     <div class="text-white flex flex-col gap-8">
         <div class="flex flex-row flex-wrap gap-8">
+            <!--Start Date-->
             <div class="flex flex-col">
                 <h2 class="text-2xl font-bold">Start Date</h2>
                 <hr class="w-full mt-1 mb-2 border-gray-600" />
                 <p>{formatDate(session.startTs!)}</p>
             </div>
-
+            
+            <!--End Date-->
             <div class="flex flex-col">
                 <h2 class="text-2xl font-bold">End Date</h2>
                 <hr class="w-full mt-1 mb-2 border-gray-600" />
                 <p>{formatDate(session.endTs!)}</p>
             </div>
 
+            <!--Start Time-->
             <div class="flex flex-col">
                 <h2 class="text-2xl font-bold">Start Time</h2>
                 <hr class="w-full mt-1 mb-2 border-gray-600" />
                 <p>{formatTime(session.startTs!)}</p>
             </div>
 
+            <!--End Time-->
             <div class="flex flex-col">
                 <h2 class="text-2xl font-bold">End Time</h2>
                 <hr class="w-full mt-1 mb-2 border-gray-600" />
                 <p>{formatTime(session.endTs!)}</p>
             </div>
 
+            <!--Duration in HH::MM::SS-->
             <div class="flex flex-col">
                 <h2 class="text-2xl font-bold">Duration</h2>
                 <hr class="w-full mt-1 mb-2 border-gray-600" />
@@ -281,6 +297,7 @@
         </div>
 
         <div>
+            <!--Session Notes. Displayed if user isn't editing notes-->
             {#if !editNotesFlag}
                 <h2 class="text-2xl font-bold">Session Notes:</h2>
                 <p class="mt-2 text-lg text-gray-300 whitespace-pre-wrap">
@@ -292,7 +309,7 @@
                     Edit Session Notes
                 </button>
 
-            <!--EDIT NOTES SECTION-->
+            <!--Edit Notes. Displayed if user is editing notes-->
             {:else if editNotesFlag}
                 <Textarea
                     id="notes-input"
