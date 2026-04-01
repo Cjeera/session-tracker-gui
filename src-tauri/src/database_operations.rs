@@ -247,20 +247,20 @@ pub fn insert_data(conn: &Connection, session_data: SessionRust) -> Result<(), A
     {
         conn.execute(
             "INSERT OR IGNORE INTO games (title)
-            VALUES (?1)",
+                VALUES (?1)",
         (
             &session_data.game,
         ))?;
 
-            let game_id: i64 = conn.query_row(
-        "SELECT game_id
-            FROM games
+        let game_id: i64 = conn.query_row(
+            "SELECT game_id
+                FROM games
             WHERE title = ?1;", 
         [&session_data.game], |row| row.get(0))?;
 
         conn.execute(
-        "INSERT INTO sessions (game_id, start_ts, end_ts, duration_seconds, notes)
-            VALUES (?1, ?2, ?3, ?4, ?5)",
+            "INSERT INTO sessions (game_id, start_ts, end_ts, duration_seconds, notes)
+                VALUES (?1, ?2, ?3, ?4, ?5)",
         (
             &game_id,
             &start_str,
@@ -304,24 +304,28 @@ pub fn insert_data_from_csv(conn: &mut Connection) -> Result<(), AppError>
 
     for result in reader.deserialize() 
     {
-        let record: SessionCSV = match result 
-        {
-            Ok(rec) => rec,
-            Err(_) => 
-            {
-                continue;
-            }
-        };
+        let record: SessionCSV = result.map_err(|e| AppError::Message(e.to_string()))?;
 
-        tx.execute(
+        // Ensure the game exists and get its ID
+        tx.execute("INSERT OR IGNORE INTO games (title) VALUES (?1)", [&record.game])?;
+        let game_id: i64 = tx.query_row
+        (
+            "SELECT game_id FROM games WHERE title = ?1",
+            [&record.game],
+            |row| row.get(0)
+        )?;
+
+        // Insert the session data
+        tx.execute
+        (
             "INSERT INTO sessions (game_id, start_ts, end_ts, duration_seconds, notes)
-            VALUES (?1, ?2, ?3, ?4, ?5)",
+                VALUES (?1, ?2, ?3, ?4, ?5)",
             (
-                record.game.as_str(),
-                record.start_ts.as_str(),
-                record.end_ts.as_str(),
-                record.duration_seconds,
-                record.notes,
+                game_id,               
+                &record.start_ts,      
+                &record.end_ts,        
+                record.duration_seconds, 
+                &record.notes,         
             ),
         )?;
     }
