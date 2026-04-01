@@ -111,7 +111,7 @@ fn stopwatch_tick(app: &AppHandle, stopwatch: &StopwatchImpl<Instant>)
 }
 
 /// Function that stops the stopwatch.
-fn stopwatch_stop(app: &AppHandle, stopwatch: &mut StopwatchImpl<Instant>)
+fn stopwatch_stop(app: &AppHandle, stopwatch: &mut StopwatchImpl<Instant>) -> Result<u128, AppError>
 {
     // Stops the stopwatch
     let _ = stopwatch.stop();
@@ -122,10 +122,10 @@ fn stopwatch_stop(app: &AppHandle, stopwatch: &mut StopwatchImpl<Instant>)
         elapsed_ms: stopwatch.elapsed().as_millis(),
     };
 
-    let _ = stopwatch.reset();
-
     // The payload struct is sent to the frontend.
     app.emit("stopwatch-tick", payload).unwrap();
+
+    Ok(stopwatch.elapsed().as_millis())
 }
 
 /// Tracks a running application's session time. Returns a struct containing session data.
@@ -182,14 +182,14 @@ pub fn track_session(game_input: &String, pid: u32, app: AppHandle, pause: Arc<A
             }
         }
 
-        // Once the application is exited, the stopwatch is stopped.
-        stopwatch_stop(&app, &mut stopwatch);
-
-        stopwatch.elapsed().as_millis()
+        // Once the application is exited, the stopwatch is stopped, and elapsed time is returned.
+        stopwatch_stop(&app, &mut stopwatch)
+        
     });
 
     // Rust waits for the thread to finish, meaning the game has been exited.
-    let stopwatch_elapsed = tracker_thread.join().unwrap_or_default();
+    // The return value from the thread (elapsed time in ms) is assigned to stopwatch_elapsed.
+    let stopwatch_elapsed = tracker_thread.join().unwrap()?;
 
     // End timestamp is taken.
     let end = Utc::now();
