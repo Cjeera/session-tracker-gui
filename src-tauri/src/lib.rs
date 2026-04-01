@@ -14,7 +14,7 @@ pub struct PauseState {
 }
 
 #[tauri::command]
-async fn get_game_list() -> Result<Vec<Game>, AppError>
+fn get_game_list() -> Result<Vec<Game>, AppError>
 {
     match get_games()
     {
@@ -24,7 +24,7 @@ async fn get_game_list() -> Result<Vec<Game>, AppError>
 }
 
 #[tauri::command]
-async fn get_game_stats(game_id: i64) -> Result<GameStats, AppError>
+fn get_game_stats(game_id: i64) -> Result<GameStats, AppError>
 {
     match get_stats(game_id)
     {
@@ -34,7 +34,7 @@ async fn get_game_stats(game_id: i64) -> Result<GameStats, AppError>
 }
 
 #[tauri::command]
-async fn get_game_sessions(game_id: i64) -> Result<Vec<Session>, AppError>
+fn get_game_sessions(game_id: i64) -> Result<Vec<Session>, AppError>
 {
     match get_sessions(game_id)
     {
@@ -44,7 +44,7 @@ async fn get_game_sessions(game_id: i64) -> Result<Vec<Session>, AppError>
 }
 
 #[tauri::command]
-async fn get_single_game(game_id: i64) -> Result<Game, AppError>
+fn get_single_game(game_id: i64) -> Result<Game, AppError>
 {
     match get_game_by_id(game_id)
     {
@@ -97,7 +97,7 @@ async fn toggle_resume(app: AppHandle) -> Result<(), AppError>
 
 /// Takes frontend input (session_notes) and the session_data struct and sends it to end_session function.
 #[tauri::command]
-async fn end_tracker(session_notes: &str, session_data: SessionRust) -> Result<(), AppError>
+fn end_tracker(session_notes: &str, session_data: SessionRust) -> Result<(), AppError>
 {
     end_session(session_notes, session_data)?;
     Ok(())
