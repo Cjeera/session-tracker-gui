@@ -6,6 +6,7 @@
         TableBodyRow,
         TableHead,
         TableHeadCell,
+        Textarea,
     } from "flowbite-svelte";
     import {
         formatDate,
@@ -16,6 +17,8 @@
 
     import type { Session } from "$lib/types";
 
+    import { invoke } from "@tauri-apps/api/core";
+
     // Sessions prop from gameInfo page.
     let { sessions }: { sessions: Session[] } = $props();
 
@@ -23,6 +26,14 @@
     let session = $state<Partial<Session>>({});
 
     let selected = $state(false);
+
+    let editNotesFlag = $state(false);
+
+    let updatedNotes = $state("");
+
+    let successMsg = $state("");
+
+    let errorMsg = $state("");
 
     type TableSession = Session & { displayId: number };
 
@@ -83,6 +94,33 @@
         // The view is toggled from the table to the single session detail.
         selected = true;
     }
+
+    async function editNotes(sessionId: number, updatedNotes: string) {
+        errorMsg = "";
+        try {
+            await invoke("edit_notes", {sessionId, updatedNotes})
+
+            session.notes = updatedNotes;
+
+            const index = sessions.findIndex(s => s.sessionId === sessionId);
+            if (index !== -1) {
+                sessions[index].notes = updatedNotes;
+            }
+
+            successMsg = "Updated Notes Successfully!";
+
+            errorMsg = "";
+
+            editNotesFlag = false;
+
+            console.log(session.notes)
+
+        } catch (error) {
+            errorMsg = "database error!"
+
+            successMsg = "";   
+        }
+    }
 </script>
 
 <!--Displays the session list view if selected if false, meaning user hasn't selected an individual session-->
@@ -98,6 +136,7 @@
         }}
         class="w-full text-left"
     >
+        <!--SESSION LIST TABLE HEADERS-->
         <!-- Displays the table headers, displaying an arrow next to them depending on sort state-->
         <TableHead>
             <TableHeadCell
@@ -167,6 +206,7 @@
             </TableHeadCell>
         </TableHead>
 
+        <!--SESSION LIST TABLE ROWS-->
         <TableBody>
             <!--Displays every entry in sortedSessions as a row-->
             {#each sortedSessions as session}
@@ -194,17 +234,19 @@
             {/each}
         </TableBody>
     </Table>
-    <!--Displays the details of single session-->
+
+<!--SINGLE SESSION VIEW-->
 {:else if selected}
     <div class="mb-6">
         <button
             class="text-blue-500 hover:text-blue-400 underline cursor-pointer"
-            onclick={() => (selected = false)}
+            onclick={() => (selected = false, successMsg = "", errorMsg = "")}
         >
             ← Back to Session List
         </button>
     </div>
 
+    <!--Displays the details of single session-->
     <div class="text-white flex flex-col gap-8">
         <div class="flex flex-row flex-wrap gap-8">
             <div class="flex flex-col">
@@ -239,10 +281,45 @@
         </div>
 
         <div>
-            <h2 class="text-2xl font-bold">Session Notes:</h2>
-            <p class="mt-2 text-lg text-gray-300 whitespace-pre-wrap">
-                {session.notes || "No session notes available."}
-            </p>
+            {#if !editNotesFlag}
+                <h2 class="text-2xl font-bold">Session Notes:</h2>
+                <p class="mt-2 text-lg text-gray-300 whitespace-pre-wrap">
+                    {session.notes ?? "No notes recorded"}
+                </p>
+                <button
+                    class="text-blue-500 hover:text-blue-400 underline cursor-pointer"
+                    onclick={() => (editNotesFlag = true, updatedNotes = session.notes ?? "", errorMsg = "", successMsg = "")}>
+                    Edit Session Notes
+                </button>
+
+            <!--EDIT NOTES SECTION-->
+            {:else if editNotesFlag}
+                <Textarea
+                    id="notes-input"
+                    class="p-2 rounded mt-3 w-lg h-64 placeholder-blue-400!"
+                    classes={{ wrapper: "!bg-primary" }}
+                    placeholder="Enter session notes..."
+                    bind:value={updatedNotes}
+                />
+
+                <button 
+                    class="text-blue-500 hover:text-blue-400 underline cursor-pointer"
+                    onclick={() => (editNotesFlag = false)}>
+                    Cancel Editing
+                </button>
+
+                <button 
+                    class="text-blue-500 hover:text-blue-400 underline cursor-pointer"
+                    onclick={() => editNotes(Number(session.sessionId), updatedNotes)}>
+                    Finish Editing
+                </button>      
+            {/if}
+
+            {#if successMsg.length > 0}
+                <p class="text-base font-semibold">{successMsg}</p>
+            {:else if errorMsg.length > 0}
+                <p class="text-base font-semibold">{errorMsg}</p>
+            {/if}
         </div>
     </div>
 {/if}

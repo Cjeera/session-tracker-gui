@@ -335,6 +335,21 @@ pub fn insert_data_from_csv(conn: &mut Connection) -> Result<(), AppError>
     Ok(())
 }
 
+pub fn edit_session_notes(session_id: i64, updated_notes: &str) -> Result<(), AppError>
+{
+    let conn = Connection::open("sessions.db")?;
+    let mut query = conn.prepare(
+        "
+        UPDATE sessions
+        SET notes = ?1
+        WHERE session_id = ?2;
+        ")?;
+
+    let _ = query.execute((updated_notes, &session_id));
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests
 {

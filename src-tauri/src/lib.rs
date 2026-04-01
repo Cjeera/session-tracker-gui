@@ -4,12 +4,13 @@ pub mod database_operations;
 pub mod csv_fallback;
 
 use crate::session_tracker::{track_session, end_session, process_search, Process};
-use crate::database_operations::{get_games, get_stats, get_sessions, get_game_by_id, Session, SessionRust, Game, GameStats};
+use crate::database_operations::{get_games, get_stats, get_sessions, get_game_by_id, edit_session_notes, Session, SessionRust, Game, GameStats};
 use crate::error::AppError;
 use tauri::{AppHandle, Builder, Manager};
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 
-pub struct PauseState {
+pub struct PauseState 
+{
   paused: Arc<AtomicBool>,
 }
 
@@ -103,6 +104,16 @@ fn end_tracker(session_notes: &str, session_data: SessionRust) -> Result<(), App
     Ok(())
 }
 
+#[tauri::command]
+fn edit_notes(session_id: i64, updated_notes: &str) -> Result<(), AppError>
+{
+    match edit_session_notes(session_id, updated_notes)
+    {
+        Ok(()) => Ok(()),
+        Err(error) => Err(error)
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = Builder::default();
@@ -126,6 +137,7 @@ pub fn run() {
             get_single_game,
             toggle_pause,
             toggle_resume,
+            edit_notes
         ])
         .setup(|app| 
         {
