@@ -46,6 +46,7 @@ impl Cover
 
 pub async fn get_access_token() -> Result<(TwitchTokenResponse, TwitchTokenRequest), AppError>
 {
+    //comment to force recompile.
     let _ = dotenvy::dotenv().ok();
 
     let client = reqwest::Client::new();
