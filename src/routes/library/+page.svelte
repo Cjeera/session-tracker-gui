@@ -3,7 +3,7 @@
         Card
     } from "flowbite-svelte";
     import { onMount } from "svelte";
-    import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+    import { invoke } from "@tauri-apps/api/core";
     import type { Game, GameCover } from "$lib/types";
 
     // Component state variables
