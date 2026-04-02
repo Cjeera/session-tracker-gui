@@ -90,7 +90,7 @@ jobs:
         with:
           tagName: app-v__VERSION__
           releaseName: 'Session Tracker GUI v__VERSION__'
-          releaseBody: 'Added cover art feature to library section.'
+          releaseBody: 'Fix for cover art section.'
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
