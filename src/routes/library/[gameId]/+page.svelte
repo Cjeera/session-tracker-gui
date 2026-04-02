@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Tabs, TabItem } from "flowbite-svelte";
+    import { Tabs, TabItem, Modal} from "flowbite-svelte";
     import { onMount } from "svelte";
     import { invoke } from "@tauri-apps/api/core";
     import { page } from "$app/state";
@@ -9,7 +9,7 @@
     import SessionTimeline from "./SessionTimeline.svelte";
     import Stats from "./Stats.svelte";
     import { formatDuration } from "$lib/timeFormatting";
-    import type { Game, GameStats, Session } from "$lib/types";
+    import type { GameCover, Game, GameStats,  Session, Cover } from "$lib/types";
 
     interface RouteParams {
         gameId: string;
@@ -18,15 +18,19 @@
     // The game id passed from the library page.
     let params = $derived(page.params as unknown as RouteParams);
     let rawId = $derived(params.gameId);
+
+    let modalState = $state(false);
     
     // Data stores for the fetched backend information
     let game = $state<Partial<Game>>({});
     let gameStats = $state<Partial<GameStats>>({});
     let sessions = $state<Session[]>([]);
+    let covers = $state<GameCover[]>([]);
 
     // UI state trackers
     let errorMsg = $state();
     let success = $state(false);
+    let changeCoverResult = $state("");
 
     /** * Fetches all tracked sessions for the currently selected game.
      */
@@ -83,8 +87,29 @@
         }
     }
 
+    async function getAltCovers(title: string, isAutoFetch: boolean) {
+        try {
+            covers = await invoke("fetch_cover_art", {name: title, isAutoFetch})
+        } catch(error) {
+            errorMsg = String(error);
+            console.error(error);
+        }
+    }
+
+    async function insertNewCover(cover: GameCover, gameId: number, isAutoFetch: boolean) {
+        try {
+            changeCoverResult = ""
+            await invoke("insert_selected_cover", {cover: cover, gameId: gameId, isAutoFetch: isAutoFetch})
+            game.coverPath = cover.cover?.url;
+            modalState = false;
+        } catch(error) {
+            errorMsg = String(error);
+            console.error(error);
+        }
+    }
+
     // Automatically trigger data fetches when the component is mounted to the DOM.
-    onMount(() => {
+    $effect(() => {
         // Only attempt to fetch data if an ID was successfully parsed from the URL.
         if (rawId) {
             getGame();
@@ -102,9 +127,28 @@
             
             <img
                 src={game.coverPath || "../placeholder.avif"}
-                alt="game cover art"
+                alt="{game.title} Cover Art"
                 class="w-64 h-96 object-cover border-2 border-blue-500"
             />
+
+            <button class="text-blue-500 hover:text-blue-400 underline cursor-pointer" onclick={() => (modalState = true, getAltCovers(String(game.title), false))}>Change Cover Art</button>
+            <Modal title="Change Cover Art" bind:open={modalState} classes={{ close: "cursor-pointer" }}>
+                <p class="font-bold">Click on the cover art which you wish to pick</p>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {#each covers as cover}
+                        <button onclick={() => (insertNewCover(cover, Number(game.gameId), false))}>
+                        <img
+                            src={cover.cover?.url}
+                            alt="{game.title} Alt Cover Art"
+                            class="w-full aspect-3/4 object-cover border-2 border-blue-500 cursor-pointer hover:opacity-80 transition-opacity"      
+                        />
+                        </button>
+                    {/each}
+                </div>
+            </Modal>
+            {#if changeCoverResult}
+                <p>{changeCoverResult}</p>
+            {/if}
 
             <h1 class="text-4xl font-bold mt-6 text-center">
                 {game.title}

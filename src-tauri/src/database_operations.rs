@@ -212,12 +212,12 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError>
             end_ts TEXT NOT NULL,
             duration_seconds INTEGER NOT NULL,
             notes TEXT,
-            FOREIGN KEY (game_id) REFERENCES games(game_id)
+            FOREIGN KEY (game_id) REFERENCES games(game_id) ON DELETE CASCADE
         );
 
         CREATE TABLE IF NOT EXISTS game_covers (
             game_id INTEGER PRIMARY KEY,
-            path TEXT,
+            path TEXT UNIQUE,
             FOREIGN KEY (game_id) REFERENCES games(game_id) ON DELETE CASCADE
         );"
     )?;
@@ -347,6 +347,33 @@ pub fn edit_session_notes(session_id: i64, updated_notes: &str) -> Result<(), Ap
 
     let _ = query.execute((updated_notes, &session_id));
 
+    Ok(())
+}
+
+pub fn insert_cover_art(game_id: i64, cover_url: &str, is_auto_fetch: bool) -> Result<(), AppError>
+{
+    let conn = Connection::open("sessions.db")?;
+
+    let mut query = if is_auto_fetch
+    {
+        conn.prepare(
+        "
+        INSERT INTO game_covers (game_id, path) VALUES (?1, ?2) 
+        ON CONFLICT(game_id) DO UPDATE SET path = excluded.path 
+        WHERE game_covers.path IS NULL;
+        ")? 
+    }
+    else 
+    {
+        conn.prepare(
+        "
+        INSERT INTO game_covers (game_id, path) VALUES (?1, ?2)
+        ON CONFLICT(game_id) DO UPDATE SET path = excluded.path;
+        ")?
+    };
+
+    let _ = query.execute((&game_id, &cover_url))?;
+    
     Ok(())
 }
 

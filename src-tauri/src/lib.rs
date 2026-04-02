@@ -2,9 +2,11 @@ pub mod error;
 pub mod session_tracker;
 pub mod database_operations;
 pub mod csv_fallback;
+pub mod api_requests;
 
+use crate::api_requests::{get_cover_art, GameCover};
 use crate::session_tracker::{track_session, end_session, process_search, Process};
-use crate::database_operations::{get_games, get_stats, get_sessions, get_game_by_id, edit_session_notes, Session, SessionRust, Game, GameStats};
+use crate::database_operations::{get_games, get_stats, get_sessions, get_game_by_id, edit_session_notes, insert_cover_art, Session, SessionRust, Game, GameStats};
 use crate::error::AppError;
 use tauri::{AppHandle, Builder, Manager};
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
@@ -114,6 +116,23 @@ fn edit_notes(session_id: i64, updated_notes: &str) -> Result<(), AppError>
     }
 }
 
+#[tauri::command]
+async fn fetch_cover_art(name: &str, is_auto_fetch: bool) -> Result<Vec<GameCover>, AppError>
+{
+    get_cover_art(name, is_auto_fetch).await
+}
+
+#[tauri::command]
+async fn insert_selected_cover(cover: GameCover, game_id: i64, is_auto_fetch: bool) -> Result<(), AppError>
+{
+    if let Some(cover_art) = cover.cover
+    {
+        insert_cover_art(game_id, &cover_art.url, is_auto_fetch)?;      
+    }
+   
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     let mut builder = Builder::default();
@@ -137,7 +156,9 @@ pub fn run() {
             get_single_game,
             toggle_pause,
             toggle_resume,
-            edit_notes
+            edit_notes,
+            fetch_cover_art,
+            insert_selected_cover,
         ])
         .setup(|app| 
         {

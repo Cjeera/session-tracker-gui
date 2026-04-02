@@ -94,7 +94,7 @@ pub fn process_search(game_input: &str) -> Result<Vec<Process>, AppError>
 /// Checks if a specific process is still running.
 fn process_exists(system: &mut System, pid: Pid) -> bool 
 {
-    system.refresh_processes(ProcessesToUpdate::Some(&[pid]), true);
+    system.refresh_processes(ProcessesToUpdate::Some(&[pid]), false);
     system.process(pid).is_some()
 }
 

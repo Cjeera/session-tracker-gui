@@ -1,5 +1,6 @@
 use thiserror::Error;
 use serde::{Serialize};
+use dotenvy;
 
 #[derive(Error, Debug)]
 pub enum AppError 
@@ -12,6 +13,15 @@ pub enum AppError
 
     #[error("Time parse error: {0}")]
     TimeParse(#[from] chrono::ParseError),
+    
+    #[error("Reqwest error: {0}")]
+    Reqwest(#[from] reqwest::Error),
+
+    #[error("Var error: {0}")]
+    Var(#[from] std::env::VarError),
+
+    #[error("Env error: {0}")]
+    Env(#[from] dotenvy::Error),
 
     #[error("Invalid input")]
     Parse,

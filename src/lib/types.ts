@@ -18,7 +18,7 @@ export interface Game {
         gameId: number;
         title: string;
         coverPath: string;
-    }
+}
 
 export interface GameStats {
         gameId: number;
@@ -31,3 +31,11 @@ export interface Process {
         pid: number;
         name: string;
     }
+
+export interface GameCover {
+    cover?: Cover;
+}
+
+export interface Cover {
+    url: string;
+}

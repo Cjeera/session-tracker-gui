@@ -1,10 +1,10 @@
 <script lang="ts">
     import {
-        Card,
+        Card
     } from "flowbite-svelte";
     import { onMount } from "svelte";
-    import { invoke } from "@tauri-apps/api/core";
-    import type { Game } from "$lib/types";
+    import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+    import type { Game, GameCover } from "$lib/types";
 
     // Component state variables
     let errorMsg = $state("");
@@ -33,9 +33,26 @@
         }
     }
 
+    async function getCoverArt(isAutoFetch: boolean) {
+        try {
+            for (const entry of games) {
+                const result = await invoke<GameCover[]>("fetch_cover_art", {name: entry.title, isAutoFetch});
+                if (result.length > 0) {
+                    await invoke("insert_selected_cover", {cover: result[0], gameId: entry.gameId, isAutoFetch: isAutoFetch});
+                    entry.coverPath = String(result[0].cover?.url);
+                }    
+            }
+            
+        } catch(error) {
+            errorMsg = String(error);
+            console.error(error);
+        }
+    }
+    
     // Automatically fetch the games as soon as the component is mounted to the DOM
-    onMount(() => {
-        getGames();
+    onMount(async () => {
+        await getGames();    
+        await getCoverArt(true);
     });
 </script>
 
