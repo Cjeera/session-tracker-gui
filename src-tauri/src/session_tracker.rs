@@ -94,7 +94,7 @@ pub fn process_search(game_input: &str) -> Result<Vec<Process>, AppError>
 /// Checks if a specific process is still running.
 fn process_exists(system: &mut System, pid: Pid) -> bool 
 {
-    system.refresh_processes(ProcessesToUpdate::Some(&[pid]), false);
+    system.refresh_processes(ProcessesToUpdate::Some(&[pid]), true);
     system.process(pid).is_some()
 }
 
@@ -129,7 +129,7 @@ fn stopwatch_stop(app: &AppHandle, stopwatch: &mut StopwatchImpl<Instant>) -> Re
 }
 
 /// Tracks a running application's session time. Returns a struct containing session data.
-pub fn track_session(game_input: &str, pid: u32, app: AppHandle, pause: Arc<AtomicBool>) -> Result<SessionRust, AppError>
+pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<AtomicBool>) -> Result<(), AppError>
 {
     // Gets a list of all running processes.
     let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()));
@@ -148,7 +148,7 @@ pub fn track_session(game_input: &str, pid: u32, app: AppHandle, pause: Arc<Atom
 
     // A new thread is created which contains the process exists check. 
     // Thread sleeps for 1 second, then checks if found process is still running. Loop repeats if still running.
-    let tracker_thread = thread::spawn(move || 
+    thread::spawn(move || 
     {
         // A stopwatch is created that will be sent to the frontend.
         let mut stopwatch = Sw::new_started();
@@ -182,32 +182,31 @@ pub fn track_session(game_input: &str, pid: u32, app: AppHandle, pause: Arc<Atom
             }
         }
 
-        // Once the application is exited, the stopwatch is stopped, and elapsed time is returned.
-        stopwatch_stop(&app, &mut stopwatch)
-        
+        // End timestamp is taken.
+        let end = Utc::now();
+
+        // Elapsed time is taken from stopwatch.
+        let stopwatch_elapsed = stopwatch_stop(&app, &mut stopwatch).unwrap();
+
+        // The duration between the start and end in seconds is calculated.
+        let duration_seconds = (stopwatch_elapsed / 1000) as i64;
+
+        // The data is gathered into the session_data struct.
+        let session_data = SessionRust
+        {
+            game: game_input.to_string(),
+            start_ts: start,
+            end_ts: end,
+            duration_seconds: duration_seconds,
+            notes: None,
+        };
+
+        app.emit("session-ended", session_data).unwrap();
+ 
     });
 
-    // Rust waits for the thread to finish, meaning the game has been exited.
-    // The return value from the thread (elapsed time in ms) is assigned to stopwatch_elapsed.
-    let stopwatch_elapsed = tracker_thread.join().unwrap()?;
-
-    // End timestamp is taken.
-    let end = Utc::now();
-
-    // The duration between the start and end in seconds is calculated.
-    let duration_seconds = (stopwatch_elapsed / 1000) as i64;
-
-    // The data is gathered into the session_data struct.
-    let session_data = SessionRust
-    {
-        game: game_input.to_string(),
-        start_ts: start,
-        end_ts: end,
-        duration_seconds: duration_seconds,
-        notes: None,
-    };
-
-    Ok(session_data)
+    
+    Ok(())
 }
 
 pub fn end_session(session_notes: &str, mut session_data: SessionRust) -> Result<(), AppError>

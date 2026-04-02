@@ -6,6 +6,7 @@ import type { SessionRust, Process } from "$lib/types";
 // A class containing all session tracking logic.
 class SessionTracker {
     unlistenStopwatch: UnlistenFn | null = null;
+    unlistenSessionEnd: UnlistenFn | null = null;
 
     // Seconds, minutes and hours, which will be formatted into HH:MM:SS.
     seconds = $state(0);
@@ -66,7 +67,6 @@ class SessionTracker {
     }
 
     trackSession = async (process: Process) => {
-
         this.paused = false;
         this.searchSuccessful = false;
         this.errorFlag = false;
@@ -82,6 +82,12 @@ class SessionTracker {
         if (this.unlistenStopwatch) {
             this.unlistenStopwatch();
         }
+
+        // Backend session is reset
+        if (this.unlistenSessionEnd) {
+            this.unlistenSessionEnd();
+        }
+
 
         // A listener is set up which will get the elapsed time in ms.
         this.unlistenStopwatch = await listen<{ elapsedMs: number }>("stopwatch-tick", (event) => {
@@ -110,13 +116,18 @@ class SessionTracker {
                 String(this.seconds).padStart(2, "0");
         });
 
+        // A listener is set up for the end of a session.
+        this.unlistenSessionEnd = await listen<SessionRust>("session-ended", (event) => {
+            this.sessionData = event.payload;
+            this.headerMessage = "Session ended!"
+        })
+
         // Calls start_tracker backend function, sending gameInput, gameInput and pid as arguments.
         try {
-            const result = await invoke<SessionRust>("start_tracker", { gameInput: this.gameInput, pid: this.pid });
-            this.sessionData = result;
-            this.headerMessage = "Session ended!";
+            await invoke("start_tracker", { gameInput: this.gameInput, pid: this.pid });
         } catch (error) {
             this.errorMsg = String(error);
+            this.gameFound = false;
         }
     }
 
@@ -147,6 +158,11 @@ class SessionTracker {
         if (this.unlistenStopwatch) {
             this.unlistenStopwatch();
             this.unlistenStopwatch = null;
+        }
+
+        if (this.unlistenSessionEnd) {
+            this.unlistenSessionEnd();
+            this.unlistenSessionEnd = null;
         }
 
         // If the user entered a new game title, assigns it to sessionData.game.

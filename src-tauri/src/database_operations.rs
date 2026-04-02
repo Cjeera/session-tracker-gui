@@ -19,7 +19,7 @@ pub struct Session
 
 
 /// A struct for housing session data to be sent to the SQLite database.
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct SessionRust
 {
     pub game: String,

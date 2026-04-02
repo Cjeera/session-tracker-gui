@@ -69,13 +69,13 @@ async fn search_processes(game_input: String) -> Result<Vec<Process>, AppError>
 
 /// Takes frontend input (game_input), pid and app, and sends it to track_session function. Returns a struct containing session data to the frontend.
 #[tauri::command]
-async fn start_tracker(game_input: String, pid: u32, app: AppHandle) -> Result<SessionRust, AppError>
+async fn start_tracker(game_input: String, pid: u32, app: AppHandle) -> Result<(), AppError>
 {
     let pause_state = app.state::<PauseState>().paused.clone();
     pause_state.store(false, Ordering::Relaxed);
-    match track_session(&game_input, pid, app.clone(), pause_state)
+    match track_session(game_input, pid, app.clone(), pause_state)
     {
-        Ok(session_data) => Ok(session_data),
+        Ok(()) => Ok(()),
         Err(error) => Err(error),
     }
 }
