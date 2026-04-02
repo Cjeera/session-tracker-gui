@@ -90,7 +90,7 @@ jobs:
         with:
           tagName: app-v__VERSION__
           releaseName: 'Session Tracker GUI v__VERSION__'
-          releaseBody: 'Added session notes editing and pause and resume feature.'
+          releaseBody: 'Added cover art feature to library section.'
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
