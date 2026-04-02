@@ -46,7 +46,7 @@ impl Cover
 
 pub async fn get_access_token() -> Result<(TwitchTokenResponse, TwitchTokenRequest), AppError>
 {
-    let _ = dotenvy::dotenv()?;
+    let _ = dotenvy::dotenv().ok();
 
     let client = reqwest::Client::new();
 
@@ -54,8 +54,8 @@ pub async fn get_access_token() -> Result<(TwitchTokenResponse, TwitchTokenReque
 
     let params = TwitchTokenRequest 
     {
-        client_id: dotenvy::var("IGDB_CLIENT_ID").map_err(|_| AppError::Message("Couldn't get IGDB_CLIENT_ID".to_string()))?,
-        client_secret: dotenvy::var("IGDB_CLIENT_SECRET").map_err(|_| AppError::Message("Couldn't get IGDB_SECRET".to_string()))?,
+        client_id: std::env::var("IGDB_CLIENT_ID").unwrap_or_else(|_| option_env!("IGDB_CLIENT_ID").unwrap_or("DEVELOPMENT_MODE").to_string()),
+        client_secret: std::env::var("IGDB_CLIENT_SECRET").unwrap_or_else(|_| option_env!("IGDB_CLIENT_ID").unwrap_or("DEVELOPMENT_MODE").to_string()),
         grant_type: "client_credentials".to_string()
     };
 
