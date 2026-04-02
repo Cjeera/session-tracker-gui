@@ -65,6 +65,11 @@
             <h1>No Games Found!</h1>
         {:else}
         <!--LIBRARY DISPLAY SECTION-->
+        {#if errorMsg}
+        <div class="bg-red-500 text-white p-4 rounded mb-4 font-bold">
+            Error: {errorMsg}
+        </div>
+        {/if}
             {#each games as game}
                 <Card
                     href="/library/{game.gameId}/"

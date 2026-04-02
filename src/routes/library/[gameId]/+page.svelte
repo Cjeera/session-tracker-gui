@@ -149,6 +149,12 @@
             {#if changeCoverResult}
                 <p>{changeCoverResult}</p>
             {/if}
+            
+            {#if errorMsg}
+                <div class="bg-red-500 text-white p-4 rounded mb-4 font-bold">
+                Error: {errorMsg}
+                </div>
+            {/if}
 
             <h1 class="text-4xl font-bold mt-6 text-center">
                 {game.title}

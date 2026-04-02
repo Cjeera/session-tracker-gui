@@ -65,6 +65,12 @@ pub async fn get_access_token() -> Result<(TwitchTokenResponse, TwitchTokenReque
         .send()
         .await?;
 
+    if !response.status().is_success() 
+    {
+        let raw_error = response.text().await?;
+        return Err(AppError::Message(format!("API Error: {}", raw_error))); 
+    }
+
     let data = response.json::<TwitchTokenResponse>().await?;
 
     Ok((data, params))
