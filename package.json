@@ -1,7 +1,7 @@
 {
   "name": "session-tracker-gui",
   "version": "0.6.1",
-  "description": "",
+  "description": "Fix for cover art",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
