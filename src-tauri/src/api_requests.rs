@@ -3,6 +3,9 @@ use serde::{Deserialize, Serialize};
 use dotenvy;
 use crate::AppError;
 
+const IGDB_CLIENT_ID: &str = env!("IGDB_CLIENT_ID");
+const IGDB_CLIENT_SECRET: &str = env!("IGDB_CLIENT_SECRET");
+
 #[derive(Serialize)]
 pub struct TwitchTokenRequest
 {
@@ -55,8 +58,8 @@ pub async fn get_access_token() -> Result<(TwitchTokenResponse, TwitchTokenReque
 
     let params = TwitchTokenRequest 
     {
-        client_id: std::env::var("IGDB_CLIENT_ID").unwrap_or_else(|_| option_env!("IGDB_CLIENT_ID").unwrap_or("DEVELOPMENT_MODE").to_string()),
-        client_secret: std::env::var("IGDB_CLIENT_SECRET").unwrap_or_else(|_| option_env!("IGDB_CLIENT_ID").unwrap_or("DEVELOPMENT_MODE").to_string()),
+        client_id: IGDB_CLIENT_ID.to_string(),
+        client_secret: IGDB_CLIENT_SECRET.to_string(),
         grant_type: "client_credentials".to_string()
     };
 
