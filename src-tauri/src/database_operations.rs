@@ -578,4 +578,58 @@ mod db_query_tests
         assert_eq!(game.title, "Cover Game");
         assert_eq!(game.cover_path, Some("https://example.com/cover.jpg".to_string()));
     }
+
+    #[test]
+    fn test_get_sessions() 
+    {
+        let conn = setup_memory_db();
+        
+        conn.execute("INSERT INTO games (title) VALUES ('Session Test Game')", []).unwrap();
+        let game_id = conn.last_insert_rowid();
+
+        // Insert a session
+        conn.execute(
+            "INSERT INTO sessions (game_id, start_ts, end_ts, duration_seconds, notes) 
+             VALUES (?1, '2023-10-01T12:00:00Z', '2023-10-01T13:00:00Z', 3600, 'Original Note')",
+             [&game_id]
+        ).unwrap();
+
+        // Test fetching the session
+        let mut query = conn.prepare("SELECT session_id, start_ts, end_ts, duration_seconds, notes FROM sessions WHERE game_id = ?1").unwrap();
+        let sessions: Vec<Session> = query.query_map([&game_id], map_sessions).unwrap().map(Result::unwrap).collect();
+        
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].duration_seconds, 3600);
+    }
+
+    #[test]
+    fn test_edit_session_notes() 
+    {
+        let conn = setup_memory_db();
+        
+        conn.execute("INSERT INTO games (title) VALUES ('Notes Game')", []).unwrap();
+        let game_id = conn.last_insert_rowid();
+
+        conn.execute(
+            "INSERT INTO sessions (game_id, start_ts, end_ts, duration_seconds, notes) 
+             VALUES (?1, '2023-10-01T12:00:00Z', '2023-10-01T13:00:00Z', 3600, 'Original Note')",
+             [&game_id]
+        ).unwrap();
+        let session_id = conn.last_insert_rowid();
+
+        // Simulate edit_session_notes
+        conn.execute(
+            "UPDATE sessions SET notes = ?1 WHERE session_id = ?2",
+            ["Updated Note", &session_id.to_string()]
+        ).unwrap();
+
+        // Verify the update
+        let updated_note: String = conn.query_row(
+            "SELECT notes FROM sessions WHERE session_id = ?1",
+            [&session_id],
+            |row| row.get(0)
+        ).unwrap();
+
+        assert_eq!(updated_note, "Updated Note");
+    }
 }
