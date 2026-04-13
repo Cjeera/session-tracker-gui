@@ -495,3 +495,87 @@ mod tests
         assert!(result_one.is_ok());
     }
 }
+
+#[cfg(test)]
+mod db_query_tests 
+{
+    use super::*;
+
+    /// Helper function to create an in-memory DB and create tables.
+    fn setup_memory_db() -> Connection 
+    {
+        let conn = Connection::open_in_memory().unwrap();
+        create_tables(&conn).unwrap();
+        conn
+    }
+
+    #[test]
+    fn test_create_tables_execution() 
+    {
+        let conn = Connection::open_in_memory().unwrap();
+        let result = create_tables(&conn);
+        assert!(result.is_ok(), "Tables should be created without errors");
+    }
+
+    #[test]
+    fn test_insert_and_get_stats() 
+    {
+        let conn = setup_memory_db();
+        
+        // Inserts a game
+        conn.execute("INSERT INTO games (title) VALUES ('Test Game 1')", []).unwrap();
+        let game_id = conn.last_insert_rowid();
+
+        // Inserts two sessions for this game
+        conn.execute(
+            "INSERT INTO sessions (game_id, start_ts, end_ts, duration_seconds, notes) 
+             VALUES (?1, '2023-10-01T12:00:00Z', '2023-10-01T13:00:00Z', 3600, 'Beat the first boss')",
+             [&game_id]
+        ).unwrap();
+
+        conn.execute(
+            "INSERT INTO sessions (game_id, start_ts, end_ts, duration_seconds, notes) 
+             VALUES (?1, '2023-10-02T12:00:00Z', '2023-10-02T12:30:00Z', 1800, 'Grinding')",
+             [&game_id]
+        ).unwrap();
+
+        // Replicate the get_stats logic.
+        let mut query = conn.prepare(
+            "SELECT game_id, COALESCE(SUM(duration_seconds), 0), COUNT(session_id), MAX(start_ts) 
+             FROM sessions WHERE game_id = ?1;"
+        ).unwrap();
+        
+        let stats = query.query_row([&game_id], map_game_stats).unwrap();
+
+        // Assert correctness
+        assert_eq!(stats.game_id, game_id);
+        assert_eq!(stats.total_playtime, 5400); // 3600 + 1800 seconds
+        assert_eq!(stats.total_sessions, 2);
+        assert_eq!(stats.last_played.unwrap(), "2023-10-02T12:00:00Z");
+    }
+
+    #[test]
+    fn test_mapping_games_with_cover() 
+    {
+        let conn = setup_memory_db();
+        
+        conn.execute("INSERT INTO games (title) VALUES ('Cover Game')", []).unwrap();
+        let game_id = conn.last_insert_rowid();
+
+        conn.execute(
+            "INSERT INTO game_covers (game_id, path) VALUES (?1, 'https://example.com/cover.jpg')",
+            [&game_id]
+        ).unwrap();
+
+        let mut query = conn.prepare(
+            "SELECT games.game_id, games.title, game_covers.path 
+             FROM games 
+             LEFT JOIN game_covers ON games.game_id = game_covers.game_id 
+             WHERE games.game_id = ?1;"
+        ).unwrap();
+
+        let game = query.query_row([&game_id], map_games).unwrap();
+        assert_eq!(game.title, "Cover Game");
+        assert_eq!(game.cover_path, Some("https://example.com/cover.jpg".to_string()));
+    }
+}
