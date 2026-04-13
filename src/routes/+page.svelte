@@ -30,16 +30,21 @@
 <main
   class="min-h-screen flex flex-col justify-center items-center gap-8 text-white"
 >
+  <!--STOPWATCH DISPLAY-->
   <form class="flex flex-col items-center" onsubmit={tracker.searchProcesses}>
     <h2 class="text-4xl font-bold mb-8 text-center">{tracker.headerMessage}</h2>
+    <!--Displays stopwatch if gameFound is true-->
     {#if tracker.gameFound}
       <h3 class="text-2xl font-bold mb-4">{tracker.stopwatchDisplay}</h3>
-      {#if tracker.paused}
+      <!--Displays a resume button if tracker is paused-->
+      {#if tracker.paused && Object.keys(tracker.sessionData).length == 0}
         <h4 class="text-2xl font-bold mb-4">Session Paused!</h4>
         <Button onclick={tracker.resumeSession} outline color="blue" class="mt-4 cursor-pointer transition-colors">Resume</Button>
-      {:else if !tracker.paused}
+      <!--Displays a pause button if tracker is unpaused-->
+      {:else if !tracker.paused && Object.keys(tracker.sessionData).length == 0}
         <Button onclick={tracker.pauseSession} outline color="blue" class="mt-4 cursor-pointer transition-colors">Pause</Button>
       {/if}
+    <!--GAME SEARCH SECTION-->
     {:else if !tracker.gameFound}
       <FloatingLabelInput
         class="w-96"
@@ -67,6 +72,7 @@
       {#if tracker.successMsg.length > 0}
         <p>{tracker.successMsg}</p>
       {/if}
+      <!--Displays a table of search results if there are any results-->
       {#if tracker.searchSuccessful}
         <Table hoverable={true} class="mt-4 w-96">
         <caption class="p-2 text-left text-lg font-semibold">Results</caption>
@@ -76,6 +82,7 @@
           </TableHead>
           <TableBody class="cursor-pointer">
             {#each tracker.searchResults as process}
+            <!--trackSession function is called when a search result is clicked-->
               <TableBodyRow onclick={() => tracker.trackSession({pid: process.pid, name: process.name})} class="bg-primary! border-blue-500! hover:bg-gray-800! cursor-pointer transition-colors">
                 <TableBodyCell>{process.pid}</TableBodyCell>
                 <TableBodyCell>{process.name}</TableBodyCell>
@@ -87,6 +94,7 @@
     {/if}
   </form>
 
+  <!--ALT NAME AND NOTES SECTION-->
   {#if Object.keys(tracker.sessionData).length > 0}
     <form class="flex flex-col items-center" onsubmit={tracker.endSession}>
       <FloatingLabelInput

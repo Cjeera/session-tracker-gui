@@ -14,15 +14,18 @@ class SessionTracker {
     hours = $state(0);
 
     // The stopwatch that will display once tracking begins.
-    stopwatchDisplay = $state("Elapsed Time: 00:00:00");
+    stopwatchDisplay = $state("");
 
     // A process array that search results will be stored in.
     searchResults = $state<Process[]>([]);
 
-    gameInput = $state("");  
-    headerMessage = $state("Enter a game title to get started");
+    gameInput = $state(""); 
     newGameInput = $state("");
+
+    headerMessage = $state("Enter a game title to get started");
+    
     sessionNotes = $state("");
+    
     successMsg = $state("");
     errorMsg = $state("");
 
@@ -87,7 +90,6 @@ class SessionTracker {
         if (this.unlistenSessionEnd) {
             this.unlistenSessionEnd();
         }
-
 
         // A listener is set up which will get the elapsed time in ms.
         this.unlistenStopwatch = await listen<{ elapsedMs: number }>("stopwatch-tick", (event) => {
@@ -188,6 +190,7 @@ class SessionTracker {
             this.gameFound = false;
             this.searchResults = [];
             this.paused = false;
+            this.stopwatchDisplay = "";
 
         } catch (error) {
             this.errorMsg = String(error);
