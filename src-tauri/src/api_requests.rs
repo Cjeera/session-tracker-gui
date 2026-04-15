@@ -153,4 +153,36 @@ mod tests
             }
         }
     }
+
+    #[test]
+    #[ignore]
+    fn test_cover_format_url_with_slashes() 
+    {
+        let mut cover = Cover {
+            url: "//images.igdb.com/igdb/image/upload/t_thumb/co2x8j.jpg".to_string(),
+        };
+        cover.format_url();
+        
+        // Should prepend "https:" and replace "t_thumb" with "t_cover_big"
+        assert_eq!(
+            cover.url,
+            "https://images.igdb.com/igdb/image/upload/t_cover_big/co2x8j.jpg"
+        );
+    }
+
+    #[test]
+    #[ignore]
+    fn test_cover_format_url_without_slashes() 
+    {
+        let mut cover = Cover {
+            url: "https://images.igdb.com/igdb/image/upload/t_thumb/co2x8j.jpg".to_string(),
+        };
+        cover.format_url();
+        
+        // Should leave the prefix alone since it doesn't start with "//", but still replace "t_thumb"
+        assert_eq!(
+            cover.url,
+            "https://images.igdb.com/igdb/image/upload/t_cover_big/co2x8j.jpg"
+        );
+    }
 }

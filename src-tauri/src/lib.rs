@@ -11,9 +11,10 @@ use crate::error::AppError;
 use tauri::{AppHandle, Builder, Manager};
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 
-pub struct PauseState 
+pub struct SessionState 
 {
   paused: Arc<AtomicBool>,
+  ended: Arc<AtomicBool>,
 }
 
 #[tauri::command]
@@ -71,9 +72,13 @@ async fn search_processes(game_input: String) -> Result<Vec<Process>, AppError>
 #[tauri::command]
 async fn start_tracker(game_input: String, pid: u32, app: AppHandle) -> Result<(), AppError>
 {
-    let pause_state = app.state::<PauseState>().paused.clone();
+    let pause_state = app.state::<SessionState>().paused.clone();
+    let end_state = app.state::<SessionState>().ended.clone();
+    
+    end_state.store(false, Ordering::Relaxed);
     pause_state.store(false, Ordering::Relaxed);
-    match track_session(game_input, pid, app.clone(), pause_state)
+
+    match track_session(game_input, pid, app.clone(), pause_state, end_state)
     {
         Ok(()) => Ok(()),
         Err(error) => Err(error),
@@ -83,7 +88,7 @@ async fn start_tracker(game_input: String, pid: u32, app: AppHandle) -> Result<(
 #[tauri::command]
 async fn toggle_pause(app: AppHandle) -> Result<(), AppError>
 {
-    let pause_state = app.state::<PauseState>().paused.clone();
+    let pause_state = app.state::<SessionState>().paused.clone();
     pause_state.store(true, Ordering::Relaxed);
 
     Ok(())
@@ -92,8 +97,17 @@ async fn toggle_pause(app: AppHandle) -> Result<(), AppError>
 #[tauri::command]
 async fn toggle_resume(app: AppHandle) -> Result<(), AppError>
 {
-    let pause_state = app.state::<PauseState>().paused.clone();
+    let pause_state = app.state::<SessionState>().paused.clone();
     pause_state.store(false, Ordering::Relaxed);
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn toggle_end(app: AppHandle) -> Result<(), AppError>
+{
+    let end_state = app.state::<SessionState>().ended.clone();
+    end_state.store(true, Ordering::Relaxed);
 
     Ok(())
 }
@@ -156,15 +170,17 @@ pub fn run() {
             get_single_game,
             toggle_pause,
             toggle_resume,
+            toggle_end,
             edit_notes,
             fetch_cover_art,
             insert_selected_cover,
         ])
         .setup(|app| 
         {
-            app.manage(PauseState 
+            app.manage(SessionState 
             {
                 paused: Arc::new(AtomicBool::new(false)),
+                ended: Arc::new(AtomicBool::new(false)),
             });
             Ok(())
         })

@@ -101,6 +101,7 @@ fn process_exists(system: &mut System, pid: Pid) -> bool
 /// Function that sends elapsed time in milliseconds to the frontend.
 fn stopwatch_tick(app: &AppHandle, stopwatch: &StopwatchImpl<Instant>)
 {
+    // Gets the elapsed time in milliseconds from the stopwatch.
     let payload = StopwatchPayload
     {
         elapsed_ms: stopwatch.elapsed().as_millis(),
@@ -116,7 +117,7 @@ fn stopwatch_stop(app: &AppHandle, stopwatch: &mut StopwatchImpl<Instant>) -> Re
     // Stops the stopwatch
     let _ = stopwatch.stop();
 
-    // Gets the elapsed time in milliseconds
+    // Gets the elapsed time in milliseconds from the stopwatch.
     let payload = StopwatchPayload
     {
         elapsed_ms: stopwatch.elapsed().as_millis(),
@@ -129,7 +130,7 @@ fn stopwatch_stop(app: &AppHandle, stopwatch: &mut StopwatchImpl<Instant>) -> Re
 }
 
 /// Tracks a running application's session time. Returns a struct containing session data.
-pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<AtomicBool>) -> Result<(), AppError>
+pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<AtomicBool>, ended: Arc<AtomicBool>) -> Result<(), AppError>
 {
     // Gets a list of all running processes.
     let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()));
@@ -159,13 +160,16 @@ pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<At
         {
             thread::sleep(sleep_time);
 
-            if !process_exists(&mut system, pid) 
+            // Exits the loop if the program isn't running or the user stops the session.
+            if !process_exists(&mut system, pid) || ended.load(Ordering::Relaxed)
             {
                 break;
             }
 
+            // If/esle block that handles pause and resume.
             if pause.load(Ordering::Relaxed)
             {
+                // If stopwatch isn't stopped, meaning the user has clicked pause, stopwatch is stopped.
                 if !stopwatch.is_stopped()
                 {
                     let _ = stopwatch.stop();
@@ -173,6 +177,7 @@ pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<At
             }
             else 
             {
+                // If stopwatch is stopped, meaning the user has clicked resume, stowpatch is started.
                 if stopwatch.is_stopped()
                 {
                     let _ = stopwatch.start();
@@ -188,7 +193,7 @@ pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<At
         // Elapsed time is taken from stopwatch.
         let stopwatch_elapsed = stopwatch_stop(&app, &mut stopwatch).unwrap();
 
-        // The duration between the start and end in seconds is calculated.
+        // The duration in seconds is calculated from elapsed time.
         let duration_seconds = (stopwatch_elapsed / 1000) as i64;
 
         // The data is gathered into the session_data struct.
@@ -209,6 +214,7 @@ pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<At
     Ok(())
 }
 
+/// Handles sending data to be inserted into the db.
 pub fn end_session(session_notes: &str, mut session_data: SessionRust) -> Result<(), AppError>
 {
     // Sets sessions notes to None if empty, assigns Some(session_notes) to the struct field if not. 

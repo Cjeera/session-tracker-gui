@@ -39,3 +39,6 @@ export interface GameCover {
 export interface Cover {
     url: string;
 }
+export const config = {
+    coverArtChoice: true
+};
