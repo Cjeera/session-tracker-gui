@@ -80,6 +80,11 @@
     <NavBrand href="/">
         <span class="self-center whitespace-nowrap text-xl font-semibold text-white">Session Tracker GUI</span>
     </NavBrand>
+    {#if tracker.stopwatchDisplay.length > 0 && activeUrl.includes("/library")}
+        <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y01/2">
+            <span class="whitespace-nowrap text-xl font-semibold text-white">{tracker.stopwatchDisplay}</span>
+        </div>
+    {/if}
     <NavHamburger/>
     <NavUl {activeUrl}>
         <NavLi href="/">Session Tracker</NavLi>
