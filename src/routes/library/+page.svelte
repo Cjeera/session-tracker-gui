@@ -5,14 +5,16 @@
     import { onMount } from "svelte";
     import { invoke } from "@tauri-apps/api/core";
     import type { Game, GameCover } from "$lib/types";
+    import { config } from "$lib/types";
+    import { ask } from "@tauri-apps/plugin-dialog";
 
     // Component state variables
     let errorMsg = $state("");
     let games = $state<Game[]>([]);
     let success = $state(false);
 
-    /** * Fetches the user's game library from the Tauri backend.
-     * Resets the current state, invokes the Rust command, and populates the UI.
+    /** Fetches the user's game library from the Tauri backend.
+        Resets the current state, invokes the Rust command, and populates the UI.
      */
     async function getGames() {
         // Reset state to default before attempting the fetch
@@ -33,6 +35,7 @@
         }
     }
 
+    /** Fetches cover art for games in the library */
     async function getCoverArt(isAutoFetch: boolean) {
         try {
             for (const entry of games) {
@@ -48,14 +51,36 @@
             console.error(error);
         }
     }
+
+    /** Gives the user choice to fetch cover art */
+    async function coverArtDialog() {
+        // Dialog box only runs if a game doesn't have a cover.
+        if (games.find(game => game.coverPath == null)) {
+                const answer = await ask("Game(s) with no cover art detected. Would you like to fetch cover art?", {
+                title: "Session Tracker GUI",
+                kind: "info"
+            });
+
+            if (answer) {
+                await getCoverArt(true);
+            } else {
+                config.coverArtChoice = false;
+            }
+        }
+    }
     
     // Automatically fetch the games as soon as the component is mounted to the DOM
     onMount(async () => {
-        await getGames();    
-        await getCoverArt(true);
+        await getGames();
+
+        // Cover art dialog only runs if connected to internet and coverArtChoice is true.
+        if (navigator.onLine && config.coverArtChoice) {
+            await coverArtDialog();   
+        }
     });
 </script>
 
+<!--LIBRARY DISPLAY SECTION-->
 <main class="min-h-screen text-white p-4">
     <div
         class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6 justify-center items-center"
@@ -64,9 +89,8 @@
         {#if !success}
             <h1>No Games Found!</h1>
         {:else}
-        <!--LIBRARY DISPLAY SECTION-->
         {#if errorMsg}
-        <div class="bg-red-500 text-white p-4 rounded mb-4 font-bold">
+        <div class="text-white p-4 rounded mb-4 font-bold">
             Error: {errorMsg}
         </div>
         {/if}

@@ -1,6 +1,5 @@
 <script lang="ts">
     import { Tabs, TabItem, Modal} from "flowbite-svelte";
-    import { onMount } from "svelte";
     import { invoke } from "@tauri-apps/api/core";
     import { page } from "$app/state";
     
