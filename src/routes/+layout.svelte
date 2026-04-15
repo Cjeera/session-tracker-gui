@@ -7,10 +7,42 @@
     import { check } from '@tauri-apps/plugin-updater';
     import { ask, message } from '@tauri-apps/plugin-dialog';
     import { relaunch } from '@tauri-apps/plugin-process';
+    import { tracker } from "./sessionTracker.svelte.js";
+    import { getCurrentWindow } from "@tauri-apps/api/window";
 
     let { children } = $props();
     let activeUrl = $derived(page.url.pathname);
 
+    $effect(() => {
+        let unlisten = () => {};
+
+        async function setupCloseListener() {
+            unlisten = await getCurrentWindow().onCloseRequested(async (event) => {
+                // Check if the tracker is running
+                if (tracker.stopwatchDisplay.length > 0) {
+                
+                    // Prevent the window from closing immediately
+                    event.preventDefault();
+
+                    // Ask the user
+                    const confirmed = await ask("Tracker is currently running. Close application?", {
+                        title: "Session Tracker GUI",
+                        kind: "warning"
+                    });
+
+                    // If they confirm, bypass the interceptor and destroy the window
+                    if (confirmed) {
+                        await getCurrentWindow().destroy(); 
+                    }
+                }
+            });
+        }
+        setupCloseListener();
+        // Cleanup the event listener if the Svelte component is destroyed
+        return () => unlisten();
+    });
+
+ 
     // Run the update check once when the app starts
     onMount(async () => {
         try {
