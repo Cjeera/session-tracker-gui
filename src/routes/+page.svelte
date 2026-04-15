@@ -28,6 +28,7 @@
 		tracker.errorMsg = "";
     tracker.successMsg = "";
 	});
+
 </script>
 
 <main
@@ -40,36 +41,38 @@
     {#if tracker.gameFound}
       <h3 class="text-2xl font-bold mb-4">{tracker.stopwatchDisplay}</h3>
 
-      {#if tracker.paused && Object.keys(tracker.sessionData).length == 0}
-        <h4 class="text-2xl font-bold mb-2">Session Paused!</h4>
-      {/if}
-      
-      <!--Displays a resume button if tracker is paused-->
-      <div class="grid grid-cols-2 gap-2 items-center justify-center">
+        <div class="h-8 flex items-center justify-center">
+          {#if tracker.paused && Object.keys(tracker.sessionData).length == 0}
+              <h4 class="text-2xl font-bold">Session Paused!</h4>
+          {/if}
+        </div>
 
-        {#if tracker.paused && Object.keys(tracker.sessionData).length == 0}
-          <Button onclick={tracker.resumeSession} outline color="blue" class="mt-4 cursor-pointer transition-colors">
-            Resume
-            <PlaySolid class="h-5 w-5" />
-          </Button>
+        <div class="grid grid-cols-2 gap-2 items-center justify-center">
 
-      <!--Displays a pause button if tracker is unpaused-->
-        {:else if !tracker.paused && Object.keys(tracker.sessionData).length == 0}
-          <Button onclick={tracker.pauseSession} outline color="blue" class="mt-4 cursor-pointer transition-colors">
-            Pause
-            <PauseSolid class="h-5 w-5" />
-          </Button>
-        {/if}
+          <!--Displays resume button if tracker is paused-->
+          {#if tracker.paused && Object.keys(tracker.sessionData).length == 0}
+            <Button onclick={tracker.resumeSession} outline color="blue" class="w-24 mt-4 cursor-pointer transition-colors">
+              Resume
+              <PlaySolid/>
+            </Button>
 
-        <!--Displays a stop button if tracker is unpaused-->
-        {#if Object.keys(tracker.sessionData).length == 0}
-          <Button onclick={tracker.userStopSession} outline color="blue" class="mt-4 cursor-pointer transition-colors">
-            Stop
-          <StopSolid class="h-5 w-5" />
-          </Button>
-        {/if}
+          <!--Displays paused button if tracker is running-->
+          {:else if !tracker.paused && Object.keys(tracker.sessionData).length == 0}
+            <Button onclick={tracker.pauseSession} outline color="blue" class="w-24 mt-4 cursor-pointer transition-colors">
+              Pause
+              <PauseSolid/>
+            </Button>
+          {/if}
 
-      </div>
+          <!--Stop session button-->
+          {#if Object.keys(tracker.sessionData).length == 0}
+            <Button onclick={tracker.userStopSession} outline color="blue" class="w-24 mt-4 cursor-pointer transition-colors">
+              Stop
+            <StopSolid/>
+            </Button>
+          {/if}
+
+        </div>
     <!--GAME SEARCH SECTION-->
     {:else if !tracker.gameFound}
       <FloatingLabelInput
