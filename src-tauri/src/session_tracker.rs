@@ -101,6 +101,7 @@ fn process_exists(system: &mut System, pid: Pid) -> bool
 /// Function that sends elapsed time in milliseconds to the frontend.
 fn stopwatch_tick(app: &AppHandle, stopwatch: &StopwatchImpl<Instant>)
 {
+    // Gets the elapsed time in milliseconds from the stopwatch.
     let payload = StopwatchPayload
     {
         elapsed_ms: stopwatch.elapsed().as_millis(),
@@ -116,7 +117,7 @@ fn stopwatch_stop(app: &AppHandle, stopwatch: &mut StopwatchImpl<Instant>) -> Re
     // Stops the stopwatch
     let _ = stopwatch.stop();
 
-    // Gets the elapsed time in milliseconds
+    // Gets the elapsed time in milliseconds from the stopwatch.
     let payload = StopwatchPayload
     {
         elapsed_ms: stopwatch.elapsed().as_millis(),
@@ -159,13 +160,16 @@ pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<At
         {
             thread::sleep(sleep_time);
 
+            // Exits the loop if the program isn't running.
             if !process_exists(&mut system, pid) 
             {
                 break;
             }
 
+            // If/esle block that handles pause and resume.
             if pause.load(Ordering::Relaxed)
             {
+                // If stopwatch isn't stopped, meaning the user has clicked pause, stopwatch is stopped.
                 if !stopwatch.is_stopped()
                 {
                     let _ = stopwatch.stop();
@@ -173,6 +177,7 @@ pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<At
             }
             else 
             {
+                // If stopwatch is stopped, meaning the user has clicked resume, stowpatch is started.
                 if stopwatch.is_stopped()
                 {
                     let _ = stopwatch.start();
@@ -209,6 +214,7 @@ pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<At
     Ok(())
 }
 
+/// Handles sending data to be inserted into the db.
 pub fn end_session(session_notes: &str, mut session_data: SessionRust) -> Result<(), AppError>
 {
     // Sets sessions notes to None if empty, assigns Some(session_notes) to the struct field if not. 
