@@ -3,7 +3,6 @@
   import {
     FloatingLabelInput,
     Textarea,
-    Label,
     Button,
     Helper,
   } from "flowbite-svelte";

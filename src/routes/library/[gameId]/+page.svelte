@@ -8,7 +8,7 @@
     import SessionTimeline from "./SessionTimeline.svelte";
     import Stats from "./Stats.svelte";
     import { formatDuration } from "$lib/timeFormatting";
-    import type { GameCover, Game, GameStats,  Session, Cover } from "$lib/types";
+    import type { GameCover, Game, GameStats,  Session } from "$lib/types";
 
     interface RouteParams {
         gameId: string;
@@ -28,7 +28,6 @@
 
     // UI state trackers
     let errorMsg = $state();
-    let success = $state(false);
     let changeCoverResult = $state("");
 
     /** * Fetches all tracked sessions for the currently selected game.
@@ -68,7 +67,6 @@
     async function getGameStats() {
         // Reset state before fetching
         errorMsg = "";
-        success = false;
         gameStats = {};
 
         try {
@@ -78,8 +76,6 @@
             // Await the stats payload from the Rust backend
             gameStats = await invoke("get_game_stats", { gameId: numericId });
             
-            // Mark the fetch as successful to update dependent UI elements
-            success = true;
         } catch (error) {
             errorMsg = error;
             console.error("Failed to load stats:", error);
@@ -150,7 +146,7 @@
             {/if}
             
             {#if errorMsg}
-                <div class="bg-red-500 text-white p-4 rounded mb-4 font-bold">
+                <div class="text-white p-4 rounded mb-4 font-bold">
                 Error: {errorMsg}
                 </div>
             {/if}
