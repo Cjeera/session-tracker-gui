@@ -153,6 +153,14 @@ class SessionTracker {
         }   
     }
 
+    userStopSession = async () => {
+        try {
+            await invoke("toggle_end")
+        } catch (error) {
+            this.errorMsg = String(error)
+        }
+    }
+
     endSession = async (event: Event) => {
         event.preventDefault();
 

@@ -130,7 +130,7 @@ fn stopwatch_stop(app: &AppHandle, stopwatch: &mut StopwatchImpl<Instant>) -> Re
 }
 
 /// Tracks a running application's session time. Returns a struct containing session data.
-pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<AtomicBool>) -> Result<(), AppError>
+pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<AtomicBool>, ended: Arc<AtomicBool>) -> Result<(), AppError>
 {
     // Gets a list of all running processes.
     let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()));
@@ -160,8 +160,8 @@ pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<At
         {
             thread::sleep(sleep_time);
 
-            // Exits the loop if the program isn't running.
-            if !process_exists(&mut system, pid) 
+            // Exits the loop if the program isn't running or the user stops the session.
+            if !process_exists(&mut system, pid) || ended.load(Ordering::Relaxed)
             {
                 break;
             }
@@ -193,7 +193,7 @@ pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<At
         // Elapsed time is taken from stopwatch.
         let stopwatch_elapsed = stopwatch_stop(&app, &mut stopwatch).unwrap();
 
-        // The duration between the start and end in seconds is calculated.
+        // The duration in seconds is calculated from elapsed time.
         let duration_seconds = (stopwatch_elapsed / 1000) as i64;
 
         // The data is gathered into the session_data struct.
