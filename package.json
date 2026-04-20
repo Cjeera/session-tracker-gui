@@ -23,6 +23,7 @@
   },
   "devDependencies": {
     "@flowbite-svelte-plugins/chart": "^0.2.4",
+    "@flowbite-svelte-plugins/datatable": "^0.4.1",
     "@sveltejs/adapter-static": "^3.0.10",
     "@sveltejs/kit": "^2.0.0",
     "@sveltejs/vite-plugin-svelte": "7.0.0",
@@ -33,6 +34,7 @@
     "flowbite": "^4.0.1",
     "flowbite-svelte": "^1.31.0",
     "flowbite-svelte-icons": "^3.1.0",
+    "simple-datatables": "^10.2.0",
     "svelte": "^5.0.0",
     "svelte-check": "^4.0.0",
     "tslib": "^2.8.1",

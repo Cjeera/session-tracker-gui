@@ -163,9 +163,9 @@
         </div>
 
         <!--TABS BAR SECTION-->
-        <div class="w-full md:w-2/3 overflow-x-auto text-blue-500">
-            <Tabs tabStyle="underline" classes={{ content:"bg-primary!", divider: "bg-blue-500!"} }>
-                
+        <div class="w-full md:w-2/3 overflow-x-auto">
+            <Tabs tabStyle="underline" class="text-blue-500" classes={{divider: "bg-blue-500!", content: "bg-primary!"}} >
+                  
                 <!--The tab items are imported components to reduce clutter-->
                 <TabItem title="Sessions" classes={{ button:"cursor-pointer"}}> 
                     <SessionList bind:sessions/>
