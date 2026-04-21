@@ -1,7 +1,7 @@
 {
   "name": "session-tracker-gui",
-  "version": "0.7.0",
-  "description": "You can now choose not to fetch cover art. \nStopwatch will now display on the navbar on pages other than timer page. \nStop tracker manually.",
+  "version": "0.8.0",
+  "description": "Improved session list table. Now features pagination, better sorting and items per page selection.",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
