@@ -1,13 +1,14 @@
 <script lang="ts">
-    import {
-        Table,
+    import { Textarea } from "flowbite-svelte";
+
+    import {Table,
         TableBody,
         TableBodyCell,
         TableBodyRow,
         TableHead,
         TableHeadCell,
-        Textarea,
-    } from "flowbite-svelte";
+    } from "@flowbite-svelte-plugins/datatable";
+    
     import {
         formatDate,
         formatTime,
@@ -16,6 +17,9 @@
     } from "$lib/timeFormatting";
 
     import type { Session } from "$lib/types";
+
+    import type { DataTable } from "@flowbite-svelte-plugins/datatable";
+
     import { invoke } from "@tauri-apps/api/core";
 
     // Sessions prop from gameInfo page.
@@ -41,63 +45,34 @@
 
     type TableSession = Session & { displayId: number };
 
-    // Key that identifies what column is being sorted.
-    type SortKey = keyof TableSession | "";
-
-    // State for the table sorting.
-    let sortKey = $state<SortKey>("");
-    let sortDirection = $state<"asc" | "desc">("asc");
-
-    /** Handles the sorting logic when a user clicks a table header. Updates the sort key and toggles the ascending/descending direction.*/
-    function handleSort(key: SortKey) {
-        // Checks if the user clicked the column that is already being sorted.
-        if (sortKey === key) {
-            // Toggles direction to descending if currently ascending.
-            if (sortDirection === "asc") {
-                sortDirection = "desc";
-            }
-            // Disables sorting entirely if already descending.
-            else {
-                sortKey = "";
-                sortDirection = "asc";
-            }
-        }
-        // If a new column is clicked, it sets the key and defaults to ascending.
-        else {
-            sortKey = key;
-            sortDirection = "asc";
-        }
-    }
-
-    // A new sessions list is created with IDs starting from 1.
     let sortedSessions = $derived.by(() => {
         // add the sequential ID to a copy of the sessions
         let sessionsWithId: TableSession[] = sessions.map((s, i) => ({
             ...s,
             displayId: i + 1,
         }));
-
-        // Return early if no sort key
-        if (!sortKey) return sessionsWithId;
-
-        const currentKey = sortKey as keyof TableSession;
-
-        // Sort the new array (using displayId if that's the sortKey)
-        return [...sessionsWithId].sort((a, b) => {
-            let valA = a[currentKey] as any;
-            let valB = b[currentKey] as any;
-
-            if (valA < valB) return sortDirection === "asc" ? -1 : 1;
-            if (valA > valB) return sortDirection === "asc" ? 1 : -1;
-            return 0;
-        });
+        return sessionsWithId;
     });
-    /** Opens the detailed view for a specific session.*/
-    function getSingleSession(selectedSession: TableSession) {
-        // The clicked session data is assigned to the state object.
-        session = selectedSession;
 
-        // The view is toggled from the table to the single session detail.
+    /** Opens the detailed view for a specific session.*/
+    function getSingleSession(index: number, table: DataTable) {
+
+        // The row data is obtained. 
+        const row = table.data.data[index];
+
+        // The session ID of the row is taken from the first column.
+        const sessionId = Number(row.cells[0].text); 
+
+        // Attempts to find the specific session by trying to match the ID taken from the column against the IDs in sortedSessions.
+        const foundSession = sortedSessions.find(session => session.displayId === sessionId);
+
+        // If no session found, returns.
+        if (!foundSession) return;
+
+        // foundSession is assigned to found session.
+        session = foundSession;
+        
+        // Selected is set to true, which will display the session view.
         selected = true;
     }
 
@@ -140,112 +115,68 @@
         No Sessions Recorded Yet!
     </h5>
 {:else if !selected}
-    <Table
-        hoverable={true}
-        classes={{
-            div: "bg-primary! border-0 shadow-none relative overflow-x-auto",
-        }}
-        class="w-full text-left"
-    >
-        <!--SESSION LIST TABLE HEADERS-->
-        <!-- Displays the table headers, displaying an arrow next to them depending on sort state-->
-        <TableHead>
-            <TableHeadCell
-                onclick={() => handleSort("displayId")}
-                class="cursor-pointer hover:text-blue-400 select-none transition-colors"
+<!--SESSION LIST TABLE-->
+<Table
+    selectable={true}
+    onSelectRow={(index, _event, table) => {getSingleSession(index, table)}}
+    class="w-full text-left bg-transparent"
+    divClass="bg-transparent border-0 shadow-none relative overflow-x-auto"
+    dataTableOptions={{ searchable: false, sortable: true}}
+>
+<!--SESSION TABLE COLUMNS-->
+    <TableHead class="bg-transparent">
+        <TableHeadCell
+            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
+        >
+            ID
+        </TableHeadCell>
+        
+        <TableHeadCell
+            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
+        >
+            Start Date
+        </TableHeadCell>
+
+        <TableHeadCell
+            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
+        >
+            End Date
+        </TableHeadCell>
+
+        <TableHeadCell
+            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
+        >
+            Start Time
+        </TableHeadCell>
+
+        <TableHeadCell
+            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
+        >
+            End Time
+        </TableHeadCell>
+
+        <TableHeadCell
+            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
+        >
+            Duration
+        </TableHeadCell>
+    </TableHead>
+<!--SESSION TABLE ROWS-->
+    <TableBody>
+        {#each sortedSessions as session}
+            <TableBodyRow
+                class="bg-primary! border-b! border-blue-500! hover:bg-gray-800! cursor-pointer transition-colors"
             >
-                ID {sortKey === "displayId"
-                    ? sortDirection === "asc"
-                        ? "↑"
-                        : "↓"
-                    : ""}
-            </TableHeadCell>
-
-            <TableHeadCell
-                onclick={() => handleSort("startTs")}
-                class="cursor-pointer hover:text-blue-400 select-none transition-colors"
-            >
-                Start Date {sortKey === "startTs"
-                    ? sortDirection === "asc"
-                        ? "↑"
-                        : "↓"
-                    : ""}
-            </TableHeadCell>
-
-            <TableHeadCell
-                onclick={() => handleSort("endTs")}
-                class="cursor-pointer hover:text-blue-400 select-none transition-colors"
-            >
-                End Date {sortKey === "endTs"
-                    ? sortDirection === "asc"
-                        ? "↑"
-                        : "↓"
-                    : ""}
-            </TableHeadCell>
-
-            <TableHeadCell
-                onclick={() => handleSort("startTs")}
-                class="cursor-pointer hover:text-blue-400 select-none transition-colors"
-            >
-                Start Time {sortKey === "startTs"
-                    ? sortDirection === "asc"
-                        ? "↑"
-                        : "↓"
-                    : ""}
-            </TableHeadCell>
-
-            <TableHeadCell
-                onclick={() => handleSort("endTs")}
-                class="cursor-pointer hover:text-blue-400 select-none transition-colors"
-            >
-                End Time {sortKey === "endTs"
-                    ? sortDirection === "asc"
-                        ? "↑"
-                        : "↓"
-                    : ""}
-            </TableHeadCell>
-
-            <TableHeadCell
-                onclick={() => handleSort("durationSeconds")}
-                class="cursor-pointer hover:text-blue-400 select-none transition-colors"
-            >
-                Duration {sortKey === "durationSeconds"
-                    ? sortDirection === "asc"
-                        ? "↑"
-                        : "↓"
-                    : ""}
-            </TableHeadCell>
-        </TableHead>
-
-        <!--SESSION LIST TABLE ROWS-->
-        <TableBody>
-            <!--Displays every entry in sortedSessions as a row-->
-            {#each sortedSessions as session}
-                <!--If user clicks on a session row, getSingleSession is called-->
-                <TableBodyRow
-                    class="bg-primary! border-b border-blue-500! hover:bg-gray-800! cursor-pointer transition-colors"
-                    onclick={() => getSingleSession(session)}
-                >
-                    <TableBodyCell>{session.displayId}</TableBodyCell>
-
-                    <TableBodyCell
-                        >{formatLocaleDate(session.startTs)}</TableBodyCell
-                    >
-                    <TableBodyCell
-                        >{formatLocaleDate(session.endTs)}</TableBodyCell
-                    >
-                    <TableBodyCell>{formatTime(session.startTs)}</TableBodyCell>
-                    <TableBodyCell>{formatTime(session.endTs)}</TableBodyCell>
-                    <TableBodyCell
-                        >{formatDuration(
-                            session.durationSeconds,
-                        )}</TableBodyCell
-                    >
-                </TableBodyRow>
-            {/each}
-        </TableBody>
-    </Table>
-
+                <TableBodyCell class="text-gray-400 font-semibold">{session.displayId}</TableBodyCell>
+                <TableBodyCell class="text-gray-400 font-semibold">{formatLocaleDate(session.startTs)}</TableBodyCell>
+                <TableBodyCell class="text-gray-400 font-semibold">{formatLocaleDate(session.endTs)}</TableBodyCell>
+                <TableBodyCell class="text-gray-400 font-semibold">{formatTime(session.startTs)}</TableBodyCell>
+                <TableBodyCell class="text-gray-400 font-semibold">{formatTime(session.endTs)}</TableBodyCell>
+                <TableBodyCell class="text-gray-400 font-semibold">{formatDuration(session.durationSeconds)}</TableBodyCell>
+            </TableBodyRow>
+        {/each}
+    </TableBody>
+</Table>
 <!--SINGLE SESSION VIEW-->
 {:else if selected}
     <div class="mb-6">
@@ -340,3 +271,10 @@
         </div>
     </div>
 {/if}
+
+<style>
+  :global(.datatable-wrapper .datatable-table thead),
+  :global(.datatable-wrapper .datatable-table thead tr) {
+    background-color: transparent !important;
+  }
+</style>

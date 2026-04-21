@@ -192,7 +192,6 @@ pub fn get_game_by_id(game_id: i64) -> Result<Game, AppError>
     let game = query.query_row([&game_id], map_games)?;
 
     Ok(game)
-
 }
 
 /// Creates the tables used in the program.
