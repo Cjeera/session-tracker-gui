@@ -6,7 +6,8 @@
         TableBodyCell,
         TableBodyRow,
         TableHead,
-        TableHeadCell, } from "@flowbite-svelte-plugins/datatable";
+        TableHeadCell,
+    } from "@flowbite-svelte-plugins/datatable";
     
     import {
         formatDate,
@@ -114,6 +115,7 @@
         No Sessions Recorded Yet!
     </h5>
 {:else if !selected}
+<!--SESSION LIST TABLE-->
 <Table
     selectable={true}
     onSelectRow={(index, _event, table) => {getSingleSession(index, table)}}
@@ -121,39 +123,45 @@
     divClass="bg-transparent border-0 shadow-none relative overflow-x-auto"
     dataTableOptions={{ searchable: false, sortable: true}}
 >
+<!--SESSION TABLE COLUMNS-->
     <TableHead class="bg-transparent">
         <TableHeadCell
             class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
         >
             ID
         </TableHeadCell>
+        
         <TableHeadCell
             class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
         >
             Start Date
         </TableHeadCell>
-        <!-- repeat same class for all other headers -->
+
         <TableHeadCell
             class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
         >
             End Date
         </TableHeadCell>
+
         <TableHeadCell
             class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
         >
             Start Time
         </TableHeadCell>
+
         <TableHeadCell
             class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
         >
             End Time
         </TableHeadCell>
+
         <TableHeadCell
             class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
         >
             Duration
         </TableHeadCell>
     </TableHead>
+<!--SESSION TABLE ROWS-->
     <TableBody>
         {#each sortedSessions as session}
             <TableBodyRow
