@@ -56,13 +56,13 @@
     /** Opens the detailed view for a specific session.*/
     function getSingleSession(index: number, table: DataTable) {
 
-        // The row data is taken. 
+        // The row data is obtained. 
         const row = table.data.data[index];
 
-        // The session id of the row is taken.
+        // The session ID of the row is taken from the first column.
         const sessionId = Number(row.cells[0].text); 
 
-        // Attempts to find the specific session by it's ID.
+        // Attempts to find the specific session by trying to match the ID taken from the column against the IDs in sortedSessions.
         const foundSession = sortedSessions.find(session => session.displayId === sessionId);
 
         // If no session found, returns.
@@ -119,36 +119,37 @@
     onSelectRow={(index, _event, table) => {getSingleSession(index, table)}}
     class="w-full text-left bg-transparent"
     divClass="bg-transparent border-0 shadow-none relative overflow-x-auto"
+    dataTableOptions={{ searchable: false, sortable: true}}
 >
     <TableHead class="bg-transparent">
         <TableHeadCell
-            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider cursor-pointer hover:text-blue-400 select-none transition-colors px-4 py-3"
+            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
         >
             ID
         </TableHeadCell>
         <TableHeadCell
-            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider cursor-pointer hover:text-blue-400 select-none transition-colors px-4 py-3"
+            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
         >
             Start Date
         </TableHeadCell>
         <!-- repeat same class for all other headers -->
         <TableHeadCell
-            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider cursor-pointer hover:text-blue-400 select-none transition-colors px-4 py-3"
+            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
         >
             End Date
         </TableHeadCell>
         <TableHeadCell
-            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider cursor-pointer hover:text-blue-400 select-none transition-colors px-4 py-3"
+            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
         >
             Start Time
         </TableHeadCell>
         <TableHeadCell
-            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider cursor-pointer hover:text-blue-400 select-none transition-colors px-4 py-3"
+            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
         >
             End Time
         </TableHeadCell>
         <TableHeadCell
-            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider cursor-pointer hover:text-blue-400 select-none transition-colors px-4 py-3"
+            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
         >
             Duration
         </TableHeadCell>

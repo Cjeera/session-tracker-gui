@@ -10,3 +10,39 @@
 @theme {
   --color-primary: #1f2227;
 }
+
+.datatable-sorter {
+  cursor: pointer;
+}
+
+.datatable-sorter:hover {
+  color: oklch(70.7% 0.165 254.624);
+}
+
+.datatable-dropdown {
+  color:gray;
+}
+
+.datatable-selector {
+  cursor: pointer;
+}
+
+.datatable-info {
+  color: gray;
+}
+
+.datatable-pagination-list-item {
+  color: gray;
+}
+
+.datatable-pagination-list-item-link {
+  cursor: pointer;
+}
+
+.datatable-pagination-list-item-link:hover {
+  color: white;
+}
+
+.datatable-active {
+  color: white;
+}
