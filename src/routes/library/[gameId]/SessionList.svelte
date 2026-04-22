@@ -1,14 +1,15 @@
 <script lang="ts">
     import { Textarea } from "flowbite-svelte";
 
-    import {Table,
+    import {
+        Table,
         TableBody,
         TableBodyCell,
         TableBodyRow,
         TableHead,
         TableHeadCell,
     } from "@flowbite-svelte-plugins/datatable";
-    
+
     import {
         formatDate,
         formatTime,
@@ -21,6 +22,8 @@
     import type { DataTable } from "@flowbite-svelte-plugins/datatable";
 
     import { invoke } from "@tauri-apps/api/core";
+
+    import { ListPlaceholder } from "flowbite-svelte";
 
     // Sessions prop from gameInfo page.
     let { sessions = $bindable() }: { sessions: Session[] } = $props();
@@ -56,22 +59,23 @@
 
     /** Opens the detailed view for a specific session.*/
     function getSingleSession(index: number, table: DataTable) {
-
-        // The row data is obtained. 
+        // The row data is obtained.
         const row = table.data.data[index];
 
         // The session ID of the row is taken from the first column.
-        const sessionId = Number(row.cells[0].text); 
+        const sessionId = Number(row.cells[0].text);
 
         // Attempts to find the specific session by trying to match the ID taken from the column against the IDs in sortedSessions.
-        const foundSession = sortedSessions.find(session => session.displayId === sessionId);
+        const foundSession = sortedSessions.find(
+            (session) => session.displayId === sessionId,
+        );
 
         // If no session found, returns.
         if (!foundSession) return;
 
         // foundSession is assigned to found session.
         session = foundSession;
-        
+
         // Selected is set to true, which will display the session view.
         selected = true;
     }
@@ -82,13 +86,13 @@
 
         try {
             // Backend function is called with sessionId and updatedNotes sent as arguments.
-            await invoke("edit_notes", {sessionId, updatedNotes})
+            await invoke("edit_notes", { sessionId, updatedNotes });
 
             // Session notes from the single session is updated with the new notes.
             session.notes = updatedNotes;
 
             // The original sessions list is updated with the new notes.
-            const index = sessions.findIndex(s => s.sessionId === sessionId);
+            const index = sessions.findIndex((s) => s.sessionId === sessionId);
             if (index !== -1) {
                 sessions[index].notes = updatedNotes;
             }
@@ -102,87 +106,120 @@
             // Edit notes flag set to false, will cause edit notes text area to dissapear.
             editNotesFlag = false;
         } catch (error) {
-            errorMsg = "database error!"
+            errorMsg = "database error!";
 
-            successMsg = "";   
+            successMsg = "";
         }
     }
+    let tableReady = $state(false);
 </script>
 
 <!--Displays the session list view if selected if false, meaning user hasn't selected an individual session-->
-{#if sessions.length === 0}
-    <h5 class="pb-1 text-2xl leading-none font-bold text-white">
-        No Sessions Recorded Yet!
-    </h5>
-{:else if !selected}
-<!--SESSION LIST TABLE-->
-<Table
-    selectable={true}
-    onSelectRow={(index, _event, table) => {getSingleSession(index, table)}}
-    class="w-full text-left bg-transparent"
-    divClass="bg-transparent border-0 shadow-none relative overflow-x-auto"
-    dataTableOptions={{ searchable: false, sortable: true}}
->
-<!--SESSION TABLE COLUMNS-->
-    <TableHead class="bg-transparent">
-        <TableHeadCell
-            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
+{#if !selected}
+    {#if sessions.length === 0}
+        <ListPlaceholder />
+    {:else}
+        <!--SESSION LIST TABLE-->
+        <div
+            class="transition-opacity duration-75 {tableReady
+                ? 'opacity-100'
+                : 'opacity-0'}"
         >
-            ID
-        </TableHeadCell>
-        
-        <TableHeadCell
-            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
-        >
-            Start Date
-        </TableHeadCell>
-
-        <TableHeadCell
-            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
-        >
-            End Date
-        </TableHeadCell>
-
-        <TableHeadCell
-            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
-        >
-            Start Time
-        </TableHeadCell>
-
-        <TableHeadCell
-            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
-        >
-            End Time
-        </TableHeadCell>
-
-        <TableHeadCell
-            class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
-        >
-            Duration
-        </TableHeadCell>
-    </TableHead>
-<!--SESSION TABLE ROWS-->
-    <TableBody>
-        {#each sortedSessions as session}
-            <TableBodyRow
-                class="bg-primary! border-b! border-blue-500! hover:bg-gray-800! cursor-pointer transition-colors"
+            <Table
+                onInitStart={() => (tableReady = false)}
+                onInitComplete={(_table) => {
+                    tableReady = true;
+                }}
+                selectable={true}
+                onSelectRow={(index, _event, table) => {
+                    getSingleSession(index, table);
+                }}
+                class="w-full text-left bg-transparent"
+                divClass="bg-transparent border-0 shadow-none relative overflow-x-auto"
+                dataTableOptions={{ searchable: false, sortable: true }}
             >
-                <TableBodyCell class="text-gray-400 font-semibold">{session.displayId}</TableBodyCell>
-                <TableBodyCell class="text-gray-400 font-semibold">{formatLocaleDate(session.startTs)}</TableBodyCell>
-                <TableBodyCell class="text-gray-400 font-semibold">{formatLocaleDate(session.endTs)}</TableBodyCell>
-                <TableBodyCell class="text-gray-400 font-semibold">{formatTime(session.startTs)}</TableBodyCell>
-                <TableBodyCell class="text-gray-400 font-semibold">{formatTime(session.endTs)}</TableBodyCell>
-                <TableBodyCell class="text-gray-400 font-semibold">{formatDuration(session.durationSeconds)}</TableBodyCell>
-            </TableBodyRow>
-        {/each}
-    </TableBody>
-</Table>
-<!--SINGLE SESSION VIEW-->
+                <!--SESSION TABLE COLUMNS-->
+                <TableHead class="bg-transparent">
+                    <TableHeadCell
+                        class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
+                    >
+                        ID
+                    </TableHeadCell>
+
+                    <TableHeadCell
+                        class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
+                    >
+                        Start Date
+                    </TableHeadCell>
+
+                    <TableHeadCell
+                        class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
+                    >
+                        End Date
+                    </TableHeadCell>
+
+                    <TableHeadCell
+                        class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
+                    >
+                        Start Time
+                    </TableHeadCell>
+
+                    <TableHeadCell
+                        class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
+                    >
+                        End Time
+                    </TableHeadCell>
+
+                    <TableHeadCell
+                        class="bg-[#364153] text-gray-400 uppercase text-xs font-bold tracking-wider select-none transition-colors px-4 py-3"
+                    >
+                        Duration
+                    </TableHeadCell>
+                </TableHead>
+                <!--SESSION TABLE ROWS-->
+                <TableBody>
+                    {#each sortedSessions as session}
+                        <TableBodyRow
+                            class="bg-primary! border-b! border-blue-500! hover:bg-gray-800! cursor-pointer transition-colors"
+                        >
+                            <TableBodyCell class="text-gray-400 font-semibold"
+                                >{session.displayId}</TableBodyCell
+                            >
+                            <TableBodyCell class="text-gray-400 font-semibold"
+                                >{formatLocaleDate(
+                                    session.startTs,
+                                )}</TableBodyCell
+                            >
+                            <TableBodyCell class="text-gray-400 font-semibold"
+                                >{formatLocaleDate(
+                                    session.endTs,
+                                )}</TableBodyCell
+                            >
+                            <TableBodyCell class="text-gray-400 font-semibold"
+                                >{formatTime(session.startTs)}</TableBodyCell
+                            >
+                            <TableBodyCell class="text-gray-400 font-semibold"
+                                >{formatTime(session.endTs)}</TableBodyCell
+                            >
+                            <TableBodyCell class="text-gray-400 font-semibold"
+                                >{formatDuration(
+                                    session.durationSeconds,
+                                )}</TableBodyCell
+                            >
+                        </TableBodyRow>
+                    {/each}
+                </TableBody>
+            </Table>
+        </div>
+    {/if}
+    <!--SINGLE SESSION VIEW-->
 {:else if selected}
     <div class="mb-6">
         <button
             class="text-blue-500 hover:text-blue-400 underline cursor-pointer"
-            onclick={() => (selected = false, successMsg = "", errorMsg = "")}
+            onclick={() => (
+                (selected = false), (successMsg = ""), (errorMsg = "")
+            )}
         >
             ← Back to Session List
         </button>
@@ -197,7 +234,7 @@
                 <hr class="w-full mt-1 mb-2 border-gray-600" />
                 <p>{formatDate(session.startTs!)}</p>
             </div>
-            
+
             <!--End Date-->
             <div class="flex flex-col">
                 <h2 class="text-2xl font-bold">End Date</h2>
@@ -236,11 +273,17 @@
                 </p>
                 <button
                     class="text-blue-500 hover:text-blue-400 underline cursor-pointer"
-                    onclick={() => (editNotesFlag = true, updatedNotes = session.notes ?? "", errorMsg = "", successMsg = "")}>
+                    onclick={() => (
+                        (editNotesFlag = true),
+                        (updatedNotes = session.notes ?? ""),
+                        (errorMsg = ""),
+                        (successMsg = "")
+                    )}
+                >
                     Edit Session Notes
                 </button>
 
-            <!--Edit Notes. Displayed if user is editing notes-->
+                <!--Edit Notes. Displayed if user is editing notes-->
             {:else if editNotesFlag}
                 <Textarea
                     id="notes-input"
@@ -250,17 +293,20 @@
                     bind:value={updatedNotes}
                 />
 
-                <button 
+                <button
                     class="text-blue-500 hover:text-blue-400 underline cursor-pointer"
-                    onclick={() => (editNotesFlag = false)}>
+                    onclick={() => (editNotesFlag = false)}
+                >
                     Cancel Editing
                 </button>
 
-                <button 
+                <button
                     class="text-blue-500 hover:text-blue-400 underline cursor-pointer"
-                    onclick={() => editNotes(Number(session.sessionId), updatedNotes)}>
+                    onclick={() =>
+                        editNotes(Number(session.sessionId), updatedNotes)}
+                >
                     Finish Editing
-                </button>      
+                </button>
             {/if}
 
             {#if successMsg.length > 0}
@@ -271,10 +317,3 @@
         </div>
     </div>
 {/if}
-
-<style>
-  :global(.datatable-wrapper .datatable-table thead),
-  :global(.datatable-wrapper .datatable-table thead tr) {
-    background-color: transparent !important;
-  }
-</style>
