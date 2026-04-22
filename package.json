@@ -1,7 +1,7 @@
 {
   "name": "session-tracker-gui",
-  "version": "0.8.0",
-  "description": "Improved session list table. Now features pagination, better sorting and items per page selection.",
+  "version": "0.8.5",
+  "description": "Added better transitions between game info tabs.",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
