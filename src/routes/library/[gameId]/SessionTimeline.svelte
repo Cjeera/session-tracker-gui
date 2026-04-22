@@ -1,7 +1,7 @@
 <script lang="ts">
     import { formatDate } from "$lib/timeFormatting";
     import { Timeline, TimelineItem } from "flowbite-svelte";
-    import { fade } from "svelte/transition"; // <-- 1. Import fade
+    import { fade } from "svelte/transition"; 
 
     let { sessions } = $props();
 </script>
