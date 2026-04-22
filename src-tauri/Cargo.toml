@@ -1,6 +1,6 @@
 [package]
 name = "session-tracker-gui"
-version = "0.8.5"
+version = "0.8.6"
 description = "A Tauri App"
 authors = ["Cjeera"]
 edition = "2021"

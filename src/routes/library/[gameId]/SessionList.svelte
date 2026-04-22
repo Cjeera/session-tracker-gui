@@ -1,6 +1,8 @@
 <script lang="ts">
     import { Textarea } from "flowbite-svelte";
 
+    import { fade } from  "svelte/transition";
+
     import {
         Table,
         TableBody,
@@ -212,13 +214,16 @@
             </Table>
         </div>
     {/if}
-    <!--SINGLE SESSION VIEW-->
+<!--SINGLE SESSION VIEW-->
 {:else if selected}
     <div class="mb-6">
         <button
             class="text-blue-500 hover:text-blue-400 underline cursor-pointer"
             onclick={() => (
-                (selected = false), (successMsg = ""), (errorMsg = "")
+                (selected = false), 
+                (successMsg = ""), 
+                (errorMsg = ""),
+                (tableReady = false)
             )}
         >
             ← Back to Session List
@@ -226,7 +231,7 @@
     </div>
 
     <!--Displays the details of single session-->
-    <div class="text-white flex flex-col gap-8">
+    <div class="text-white flex flex-col gap-8" in:fade={{ duration: 100 }}>
         <div class="flex flex-row flex-wrap gap-8">
             <!--Start Date-->
             <div class="flex flex-col">
@@ -283,7 +288,7 @@
                     Edit Session Notes
                 </button>
 
-                <!--Edit Notes. Displayed if user is editing notes-->
+            <!--Edit notes section. Displayed if user is editing notes-->
             {:else if editNotesFlag}
                 <Textarea
                     id="notes-input"

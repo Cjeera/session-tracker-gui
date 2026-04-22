@@ -1,7 +1,7 @@
 {
   "name": "session-tracker-gui",
-  "version": "0.8.5",
-  "description": "Added better transitions between game info tabs.",
+  "version": "0.8.6",
+  "description": "added fade transition when clicking out of session view.",
   "type": "module",
   "scripts": {
     "dev": "vite dev",
