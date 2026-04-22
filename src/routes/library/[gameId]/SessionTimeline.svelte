@@ -1,18 +1,21 @@
 <script lang="ts">
     import { formatDate } from "$lib/timeFormatting";
-    import { Timeline, TimelineItem} from "flowbite-svelte";
+    import { Timeline, TimelineItem } from "flowbite-svelte";
+    import { fade } from "svelte/transition"; 
 
-    // Sessions prop from gameInfo page.
     let { sessions } = $props();
 </script>
 
-{#if sessions.length > 0}
+<div in:fade={{ duration: 75 }}> 
     <Timeline>
-        <!--Displays the date and notes of each session for a specific game in a timeline-->
         {#each sessions as session}
-            <TimelineItem class="text-gray-300" title="Notes:" date={formatDate(session.startTs)} dateFormat="full-date">{session.notes || "No session notes"}</TimelineItem>
+            <TimelineItem
+                class="text-gray-300"
+                title="Notes:"
+                date={formatDate(session.startTs)}
+                dateFormat="full-date"
+                >{session.notes || "No session notes"}
+            </TimelineItem>
         {/each}
     </Timeline>
-{:else}
-    <h5 class="pb-1 text-2xl leading-none font-bold text-white">No Sessions Recorded Yet!</h5>
-{/if}
+</div>

@@ -3,6 +3,7 @@
     import { Chart } from "@flowbite-svelte-plugins/chart";
     import type { Session } from "$lib/types";
     import type { ApexOptions } from "apexcharts";
+    import { fade } from "svelte/transition"; 
 
     // Sessions prop from gameInfo page.
     let { sessions }: { sessions: Session[] } = $props();
@@ -171,8 +172,7 @@
 </script>
 
 
-{#if sessions.length > 0}
-
+<div in:fade={{ duration: 75 }}>
     <!--Last 7 sessions chart-->
     <h5 class="pb-1 text-2xl leading-none font-bold text-white">Last 7 Sessions</h5>
     <Chart options={recentOptions} />
@@ -184,8 +184,4 @@
     <!--Most common days played chart-->
     <h5 class="pb-1 text-2xl leading-none font-bold text-white">Most Common Days Played</h5>
     <Chart options={mostPlayedDaysOptions} />
-
-<!--Displays a message if there are no sessions recorded (sessions.length > 0)-->
-{:else}
-    <h5 class="pb-1 text-2xl leading-none font-bold text-white">No Sessions Recorded Yet!</h5>
-{/if}
+</div>
