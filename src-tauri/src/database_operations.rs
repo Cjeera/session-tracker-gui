@@ -1,5 +1,4 @@
 use crate::error::AppError;
-use crate::csv_fallback::insert_data_fallback;
 use chrono::{DateTime, Utc};
 use rusqlite::{Connection};
 use serde::{Deserialize, Serialize};
@@ -277,7 +276,6 @@ pub fn insert_data(conn: &Connection, session_data: SessionRust) -> Result<(), A
         Ok(_) => return Ok(()),
         Err(error) =>
         {
-            insert_data_fallback(session_data)?;
             return Err(error)
         }
     }

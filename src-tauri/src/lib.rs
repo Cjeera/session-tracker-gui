@@ -1,7 +1,6 @@
 pub mod error;
 pub mod session_tracker;
 pub mod database_operations;
-pub mod csv_fallback;
 pub mod api_requests;
 
 use crate::api_requests::{get_cover_art, GameCover};
