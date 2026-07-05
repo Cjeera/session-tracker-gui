@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { Tabs, TabItem, Modal} from "flowbite-svelte";
+    import { Tabs, TabItem, Modal, ButtonToggleGroup, ButtonToggle, RadioButton, ButtonGroup} from "flowbite-svelte";
     import { invoke } from "@tauri-apps/api/core";
     import { page } from "$app/state";
     
@@ -7,8 +7,8 @@
     import SessionList from "./SessionList.svelte";
     import SessionTimeline from "./SessionTimeline.svelte";
     import Stats from "./Stats.svelte";
-    import { formatDuration } from "$lib/timeFormatting";
-    import type { GameCover, Game, GameStats,  Session } from "$lib/types";
+    import { formatDuration, formatLocaleDate } from "$lib/timeFormatting";
+    import type { GameCover, Game, GameStats, Session } from "$lib/types";
 
     interface RouteParams {
         gameId: string;
@@ -29,6 +29,8 @@
     // UI state trackers
     let errorMsg = $state();
     let changeCoverResult = $state("");
+    let radioGroup = $state("");
+
 
     /** * Fetches all tracked sessions for the currently selected game.
      */
@@ -56,13 +58,14 @@
             
             // Await the game data from the Rust backend
             game = await invoke("get_single_game", { gameId: numericId });
+            radioGroup = String(game.status);
         } catch (error) {
             errorMsg = error;
-            console.error("Failed to load game", error);
+            console.error(error);
         }
     }
 
-    /** * Fetches aggregated statistics (total playtime, session counts) for the game.
+    /** Fetches aggregated statistics (total playtime, session counts) for the game.
      */
     async function getGameStats() {
         // Reset state before fetching
@@ -82,6 +85,7 @@
         }
     }
 
+    /**Calls backend function to get list of alternate cover art*/
     async function getAltCovers(title: string, isAutoFetch: boolean) {
         try {
             covers = await invoke("fetch_cover_art", {name: title, isAutoFetch})
@@ -91,6 +95,7 @@
         }
     }
 
+    /**Calls backend function to insert a new game cover*/
     async function insertNewCover(cover: GameCover, gameId: number, isAutoFetch: boolean) {
         try {
             changeCoverResult = ""
@@ -98,6 +103,22 @@
             game.coverPath = cover.cover?.url;
             modalState = false;
         } catch(error) {
+            errorMsg = String(error);
+            console.error(error);
+        }
+    }
+
+    /**Calls backend function to update status of game*/
+    async function updateStatus(status: string) {
+        if (status == game.status) {
+            return;
+        }
+
+        try {
+            let numericId = Number(rawId)
+            await invoke("update_game_status", {gameId: numericId, status: status})
+            game.status = status;
+        } catch (error) {
             errorMsg = String(error);
             console.error(error);
         }
@@ -117,7 +138,7 @@
 <main class="min-h-screen p-8">
     <div class="flex flex-col md:flex-row items-start gap-12 max-w-7xl mx-auto">
 
-        <!--GAME INFO DISPAY SECTION-->
+        <!--GAME INFO DISPLAY SECTION-->
         <div class="flex flex-col items-center w-full md:w-1/3 shrink-0 text-white">
             
             <img
@@ -127,6 +148,7 @@
             />
 
             <button class="text-blue-500 hover:text-blue-400 underline cursor-pointer" onclick={() => (modalState = true, getAltCovers(String(game.title), false))}>Change Cover Art</button>
+
             <Modal title="Change Cover Art" bind:open={modalState} classes={{ close: "cursor-pointer" }}>
                 <p class="font-bold">Click on the cover art which you wish to pick</p>
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -151,15 +173,21 @@
                 </div>
             {/if}
 
-            <h1 class="text-4xl font-bold mt-6 text-center">
+            <h1 class="text-4xl font-bold mt-2 text-center">
                 {game.title}
             </h1>
 
             <div class="mt-4 flex flex-col items-center text-xl gap-2 font-semibold">
                 <p>Total Hours Played: {gameStats.totalPlaytime ? formatDuration(gameStats.totalPlaytime) : "00:00:00"}</p>
                 <p>Total Sessions: {gameStats.totalSessions || 0}</p>
-            </div>
+                <p>Last Played: {formatLocaleDate(String(gameStats.lastPlayed))}</p>
 
+                <ButtonGroup>
+                    <RadioButton onclick={() => updateStatus("played")} outline checkedClass="outline-2 outline-blue-500" class="cursor-pointer" value="played" bind:group={radioGroup}>Played</RadioButton >
+                    <RadioButton onclick={() => updateStatus("playing")} outline checkedClass="outline-2 outline-blue-500" class="cursor-pointer" value="playing" bind:group={radioGroup}>Playing</RadioButton >
+                    <RadioButton onclick={() => updateStatus("backlog")} outline checkedClass="outline-2 outline-blue-500" class="cursor-pointer" value="backlog" bind:group={radioGroup}>Backlog</RadioButton >
+                </ButtonGroup>
+            </div>
         </div>
 
         <!--TABS BAR SECTION-->

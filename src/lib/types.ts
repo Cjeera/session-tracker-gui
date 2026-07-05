@@ -18,6 +18,7 @@ export interface Game {
         gameId: number;
         title: string;
         coverPath: string;
+        status: string;
 }
 
 export interface GameStats {

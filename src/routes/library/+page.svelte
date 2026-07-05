@@ -82,9 +82,7 @@
 
 <!--LIBRARY DISPLAY SECTION-->
 <main class="min-h-screen text-white p-4">
-    <div
-        class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6 justify-center items-center"
-    >
+    <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-6 justify-center items-center">
         <!--Displays message if no games are found-->
         {#if !success}
             <h1>No Games Found!</h1>

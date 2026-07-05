@@ -5,7 +5,7 @@ pub mod api_requests;
 
 use crate::api_requests::{get_cover_art, GameCover};
 use crate::session_tracker::{track_session, end_session, process_search, Process};
-use crate::database_operations::{get_games, get_stats, get_sessions, get_game_by_id, edit_session_notes, insert_cover_art, Session, SessionRust, Game, GameStats};
+use crate::database_operations::{get_games, get_stats, get_sessions, get_game_by_id, edit_session_notes, insert_cover_art, update_status, Session, SessionRust, Game, GameStats};
 use crate::error::AppError;
 use tauri::{AppHandle, Builder, Manager};
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
@@ -54,6 +54,18 @@ fn get_single_game(game_id: i64) -> Result<Game, AppError>
         Ok(game) => Ok(game),
         Err(error) => Err(error),
     }
+}
+
+#[tauri::command]
+fn update_game_status(game_id: i64, status: &str) -> Result<(), AppError>
+{
+    match update_status(game_id, status)
+    {
+        Ok(()) => {},
+        Err(error) => return Err(error),
+    }
+
+    Ok(())
 }
 
 /// Takes frontend input (game_input) and sends it to find_process_by_name function. Returns the process ID as an unsigned integer to the frontend.
@@ -173,6 +185,7 @@ pub fn run() {
             edit_notes,
             fetch_cover_art,
             insert_selected_cover,
+            update_game_status
         ])
         .setup(|app| 
         {

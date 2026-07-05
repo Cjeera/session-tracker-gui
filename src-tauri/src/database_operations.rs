@@ -1,8 +1,7 @@
 use crate::error::AppError;
 use chrono::{DateTime, Utc};
-use rusqlite::{Connection};
+use rusqlite::{Connection, params};
 use serde::{Deserialize, Serialize};
-use std::fs;
 
 /// A struct for housing select results from the SQLite database to be sent to the frontend.
 #[derive(Debug, Serialize)]
@@ -28,30 +27,19 @@ pub struct SessionRust
     pub notes: Option<String>,
 }
 
-/// A struct for housing session data for CSV fallback.
-#[derive(Debug, Deserialize)]
-struct SessionCSV 
-{
-    game: String,
-    start_ts: String,
-    end_ts: String,
-    duration_seconds: i64,
-    #[serde(default)] 
-    notes: Option<String>,
-}
-
 /// A struct for storing game IDs, game titles and cover art.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Game
 {
     game_id: i64,
     title: String,
     cover_path: Option<String>,
+    status: String,
 }
 
 /// A struct for play time info on a specific game.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GameStats
 {
@@ -114,6 +102,7 @@ fn map_games(row: &rusqlite::Row<'_>) -> Result<Game, rusqlite::Error>
         game_id: row.get(0)?,
         title: row.get(1)?,
         cover_path: row.get(2)?,
+        status: row.get(3)?,
     })
 }
 
@@ -126,7 +115,8 @@ pub fn get_games() -> Result<Vec<Game>, AppError>
         "SELECT 
             games.game_id, 
             games.title,
-            game_covers.path
+            game_covers.path,
+            games.status
         FROM games
         LEFT JOIN game_covers ON
         games.game_id = game_covers.game_id;")?;
@@ -182,7 +172,8 @@ pub fn get_game_by_id(game_id: i64) -> Result<Game, AppError>
         "SELECT 
             games.game_id, 
             games.title,
-            game_covers.path
+            game_covers.path,
+            games.status
         FROM games
         LEFT JOIN game_covers ON games.game_id = game_covers.game_id
         WHERE games.game_id = ?1;"
@@ -193,6 +184,19 @@ pub fn get_game_by_id(game_id: i64) -> Result<Game, AppError>
     Ok(game)
 }
 
+pub fn update_status(game_id: i64, status: &str) -> Result<(), AppError>
+{
+    let conn = open_connection()?;
+
+    let _ = conn.execute(
+        "UPDATE games
+            SET status = ?1
+        WHERE game_id = ?2;", 
+        params![&status, &game_id])?;
+
+    Ok(())
+}
+
 /// Creates the tables used in the program.
 pub fn create_tables(conn: &Connection) -> Result<(), AppError>
 {
@@ -200,7 +204,8 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError>
         "       
         CREATE TABLE IF NOT EXISTS games (
             game_id INTEGER PRIMARY KEY,
-            title TEXT UNIQUE NOT NULL
+            title TEXT UNIQUE NOT NULL,
+            status TEXT
         );
 
         CREATE TABLE IF NOT EXISTS sessions (
@@ -226,6 +231,7 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError>
 /// Inserts session into database.
 pub fn insert_data(conn: &Connection, session_data: SessionRust) -> Result<(), AppError>
 {
+    // Returns early if title is empty or duration is negative.
     if session_data.game.trim().is_empty()
     {
         return Err(AppError::Message("title cannot be empty!".to_string()))
@@ -238,11 +244,13 @@ pub fn insert_data(conn: &Connection, session_data: SessionRust) -> Result<(), A
 
     create_tables(conn)?;
 
+    // Converts the timestamps to an RFC3339 formatted string.
     let start_str = session_data.start_ts.to_rfc3339();
     let end_str = session_data.end_ts.to_rfc3339();
 
     let db_result = || -> Result<(), AppError>
     {
+        // Inserts game title into db. Doesn't insert if value already exists.
         conn.execute(
             "INSERT OR IGNORE INTO games (title)
                 VALUES (?1)",
@@ -250,12 +258,14 @@ pub fn insert_data(conn: &Connection, session_data: SessionRust) -> Result<(), A
             &session_data.game,
         ))?;
 
+        // Gets the id of the game via it's title.
         let game_id: i64 = conn.query_row(
             "SELECT game_id
                 FROM games
             WHERE title = ?1;", 
         [&session_data.game], |row| row.get(0))?;
 
+        // Inserts the session data into the db, using the game_id from the previous query,
         conn.execute(
             "INSERT INTO sessions (game_id, start_ts, end_ts, duration_seconds, notes)
                 VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -279,57 +289,6 @@ pub fn insert_data(conn: &Connection, session_data: SessionRust) -> Result<(), A
             return Err(error)
         }
     }
-}
-
-/// Imports CSV sessions into the database
-pub fn insert_data_from_csv(conn: &mut Connection) -> Result<(), AppError> 
-{
-    let file_path = "session.csv";
-    
-    if !std::path::Path::new(file_path).exists() 
-    {
-        return Ok(());
-    }
-
-    let file = fs::File::open(file_path)?;
-    
-    let mut reader = csv::ReaderBuilder::new()
-        .has_headers(true) 
-        .from_reader(file);
-
-    let tx = conn.transaction()?;
-
-    for result in reader.deserialize() 
-    {
-        let record: SessionCSV = result.map_err(|e| AppError::Message(e.to_string()))?;
-
-        // Ensure the game exists and get its ID
-        tx.execute("INSERT OR IGNORE INTO games (title) VALUES (?1)", [&record.game])?;
-        let game_id: i64 = tx.query_row
-        (
-            "SELECT game_id FROM games WHERE title = ?1",
-            [&record.game],
-            |row| row.get(0)
-        )?;
-
-        // Insert the session data
-        tx.execute
-        (
-            "INSERT INTO sessions (game_id, start_ts, end_ts, duration_seconds, notes)
-                VALUES (?1, ?2, ?3, ?4, ?5)",
-            (
-                game_id,               
-                &record.start_ts,      
-                &record.end_ts,        
-                record.duration_seconds, 
-                &record.notes,         
-            ),
-        )?;
-    }
-
-    tx.commit()?;
-    
-    Ok(())
 }
 
 pub fn edit_session_notes(session_id: i64, updated_notes: &str) -> Result<(), AppError>

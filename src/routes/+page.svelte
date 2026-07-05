@@ -86,6 +86,7 @@
         bind:value={tracker.gameInput}
         type="text"
         classes={{ label: "!bg-primary", close:"cursor-pointer transition-colors" }}
+        required
       >
         Enter a name...
       </FloatingLabelInput>
