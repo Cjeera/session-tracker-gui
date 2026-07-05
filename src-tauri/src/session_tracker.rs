@@ -14,17 +14,17 @@ use fuzzy_matcher::FuzzyMatcher;
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct Process
+struct StopwatchPayload 
 {
-    pid: u32,
-    name: String,
+    elapsed_ms: u128,
 }
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct StopwatchPayload 
+pub struct Process
 {
-    elapsed_ms: u128,
+    pid: u32,
+    name: String,
 }
 
 /// Helper function for removing extension from process names

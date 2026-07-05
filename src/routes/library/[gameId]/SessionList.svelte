@@ -30,7 +30,7 @@
     // Sessions prop from gameInfo page.
     let { sessions = $bindable() }: { sessions: Session[] } = $props();
 
-    // State for the single session view.
+    // Container for the single session view.
     let session = $state<Partial<Session>>({});
 
     // State for single session view display.
@@ -116,7 +116,7 @@
     let tableReady = $state(false);
 </script>
 
-<!--Displays the session list view if selected if false, meaning user hasn't selected an individual session-->
+<!--Displays the session list view if selected is false, meaning user hasn't selected an individual session-->
 {#if !selected}
     {#if sessions.length === 0}
         <ListPlaceholder />

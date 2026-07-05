@@ -93,7 +93,7 @@ jobs:
         with:
           tagName: app-v__VERSION__
           releaseName: 'Session Tracker GUI v__VERSION__'
-          releaseBody: 'Fix for cover art section.'
+          releaseBody: 'Added backlogging feature and last played stat.'
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
