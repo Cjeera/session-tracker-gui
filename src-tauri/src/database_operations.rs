@@ -515,7 +515,7 @@ mod db_query_tests
     {
         let conn = setup_memory_db();
         
-        conn.execute("INSERT INTO games (title) VALUES ('Cover Game')", []).unwrap();
+        conn.execute("INSERT INTO games (title, status) VALUES ('Cover Game', 'played')", []).unwrap();
         let game_id = conn.last_insert_rowid();
 
         conn.execute(
@@ -524,7 +524,7 @@ mod db_query_tests
         ).unwrap();
 
         let mut query = conn.prepare(
-            "SELECT games.game_id, games.title, game_covers.path 
+            "SELECT games.game_id, games.title, game_covers.path, status 
              FROM games 
              LEFT JOIN game_covers ON games.game_id = game_covers.game_id 
              WHERE games.game_id = ?1;"
