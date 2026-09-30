@@ -1,7 +1,8 @@
 <script>
     import { onMount } from 'svelte';
     import { page } from "$app/state";
-    import { Navbar, NavBrand, NavLi, NavUl, NavHamburger } from "flowbite-svelte";
+    import "../app.css";
+    import { Button } from "$lib/components/ui/button";
     
     // Import the Tauri plugins
     import { check } from '@tauri-apps/plugin-updater';
@@ -75,21 +76,17 @@
     });
 </script>
 
-<!--NAVIGATION BAR-->
-<Navbar fluid={true}>
-    <NavBrand href="/">
-        <span class="self-center whitespace-nowrap text-xl font-semibold text-white">Session Tracker GUI</span>
-    </NavBrand>
-    {#if tracker.stopwatchDisplay.length > 0 && activeUrl.includes("/library")}
-        <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y01/2">
-            <span class="whitespace-nowrap text-xl font-semibold text-white">{tracker.stopwatchDisplay}</span>
+<header class="border-b bg-card">
+    <nav aria-label="Main navigation" class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 p-4">
+        <a href="/" class="text-xl font-semibold">Session Tracker GUI</a>
+        {#if tracker.stopwatchDisplay.length > 0 && activeUrl.includes("/library")}
+            <span class="font-mono text-xl tabular-nums" role="timer">{tracker.stopwatchDisplay}</span>
+        {/if}
+        <div class="flex gap-2">
+            <Button href="/" variant={activeUrl === "/" ? "secondary" : "ghost"} aria-current={activeUrl === "/" ? "page" : undefined}>Session Tracker</Button>
+            <Button href="/library" variant={activeUrl.startsWith("/library") ? "secondary" : "ghost"} aria-current={activeUrl.startsWith("/library") ? "page" : undefined}>Library</Button>
         </div>
-    {/if}
-    <NavHamburger/>
-    <NavUl {activeUrl}>
-        <NavLi href="/">Session Tracker</NavLi>
-        <NavLi href="/library">Library</NavLi>
-    </NavUl>
-</Navbar>
+    </nav>
+</header>
 
 {@render children()}
