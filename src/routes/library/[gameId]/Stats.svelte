@@ -1,6 +1,5 @@
 <script lang="ts">
     import { BarChart, PieChart } from "layerchart/svg";
-    import { scaleBand } from "d3-scale";
     import * as Chart from "$lib/components/ui/chart";
     import * as Card from "$lib/components/ui/card";
     import { formatDuration } from "$lib/timeFormatting";
@@ -52,7 +51,7 @@
                         data={recentSessions}
                         x="day"
                         y="sessions"
-                        xScale={scaleBand().padding(0.25)}
+                        bandPadding={0.25}
                         xDomain={recentSessions.map((day) => day.day)}
                         yDomain={[0, null]}
                         yNice
@@ -82,7 +81,7 @@
                         orientation="horizontal"
                         x="durationSeconds"
                         y="key"
-                        yScale={scaleBand().padding(0.25)}
+                        bandPadding={0.25}
                         yDomain={longestSessions.map((session) => session.key)}
                         xDomain={[0, null]}
                         axis="y"
