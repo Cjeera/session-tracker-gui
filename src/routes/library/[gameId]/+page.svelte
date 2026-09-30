@@ -1,5 +1,9 @@
 <script lang="ts">
-    import { Tabs, TabItem, Modal, ButtonToggleGroup, ButtonToggle, RadioButton, ButtonGroup} from "flowbite-svelte";
+    import * as Tabs from "$lib/components/ui/tabs";
+    import * as Dialog from "$lib/components/ui/dialog";
+    import * as RadioGroup from "$lib/components/ui/radio-group";
+    import { Label } from "$lib/components/ui/label";
+    import { Button } from "$lib/components/ui/button";
     import { invoke } from "@tauri-apps/api/core";
     import { page } from "$app/state";
     
@@ -27,8 +31,7 @@
     let covers = $state<GameCover[]>([]);
 
     // UI state trackers
-    let errorMsg = $state();
-    let changeCoverResult = $state("");
+    let errorMsg = $state("");
     let radioGroup = $state("");
 
 
@@ -60,7 +63,7 @@
             game = await invoke("get_single_game", { gameId: numericId });
             radioGroup = String(game.status);
         } catch (error) {
-            errorMsg = error;
+            errorMsg = String(error);
             console.error(error);
         }
     }
@@ -80,7 +83,7 @@
             gameStats = await invoke("get_game_stats", { gameId: numericId });
             
         } catch (error) {
-            errorMsg = error;
+            errorMsg = String(error);
             console.error("Failed to load stats:", error);
         }
     }
@@ -98,7 +101,6 @@
     /**Calls backend function to insert a new game cover*/
     async function insertNewCover(cover: GameCover, gameId: number, isAutoFetch: boolean) {
         try {
-            changeCoverResult = ""
             await invoke("insert_selected_cover", {cover: cover, gameId: gameId, isAutoFetch: isAutoFetch})
             game.coverPath = cover.cover?.url;
             modalState = false;
@@ -119,6 +121,7 @@
             await invoke("update_game_status", {gameId: numericId, status: status})
             game.status = status;
         } catch (error) {
+            radioGroup = String(game.status);
             errorMsg = String(error);
             console.error(error);
         }
@@ -139,36 +142,34 @@
     <div class="flex flex-col md:flex-row items-start gap-12 max-w-7xl mx-auto">
 
         <!--GAME INFO DISPLAY SECTION-->
-        <div class="flex flex-col items-center w-full md:w-1/3 shrink-0 text-white">
+        <div class="flex flex-col items-center w-full md:w-1/3 shrink-0 text-foreground">
             
             <img
-                src={game.coverPath || "../placeholder.avif"}
+                src={game.coverPath || "/placeholder.avif"}
                 alt="{game.title} Cover Art"
-                class="w-64 h-96 object-cover border-2 border-blue-500"
+                class="w-64 h-96 object-cover rounded-lg border"
             />
 
-            <button class="text-blue-500 hover:text-blue-400 underline cursor-pointer" onclick={() => (modalState = true, getAltCovers(String(game.title), false))}>Change Cover Art</button>
+            <Button variant="link" onclick={() => { modalState = true; getAltCovers(String(game.title), false); }}>Change Cover Art</Button>
+            <Dialog.Root bind:open={modalState}>
+                <Dialog.Content class="max-h-[85vh] overflow-y-auto sm:max-w-3xl">
+                    <Dialog.Header>
+                        <Dialog.Title>Change Cover Art</Dialog.Title>
+                        <Dialog.Description>Choose the cover art you wish to use.</Dialog.Description>
+                    </Dialog.Header>
+                    {#if errorMsg}<p class="text-destructive" role="alert">{errorMsg}</p>{/if}
+                    <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
+                        {#each covers as cover}
+                            <button class="overflow-hidden rounded-md border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Use this cover for {game.title}" onclick={() => insertNewCover(cover, Number(game.gameId), false)}>
+                                <img src={cover.cover?.url} alt="{game.title} alternate cover" class="aspect-3/4 w-full object-cover" />
+                            </button>
+                        {/each}
+                    </div>
+                </Dialog.Content>
+            </Dialog.Root>
 
-            <Modal title="Change Cover Art" bind:open={modalState} classes={{ close: "cursor-pointer" }}>
-                <p class="font-bold">Click on the cover art which you wish to pick</p>
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {#each covers as cover}
-                        <button onclick={() => (insertNewCover(cover, Number(game.gameId), false))}>
-                        <img
-                            src={cover.cover?.url}
-                            alt="{game.title} Alt Cover Art"
-                            class="w-full aspect-3/4 object-cover border-2 border-blue-500 cursor-pointer hover:opacity-80 transition-opacity"      
-                        />
-                        </button>
-                    {/each}
-                </div>
-            </Modal>
-            {#if changeCoverResult}
-                <p>{changeCoverResult}</p>
-            {/if}
-            
             {#if errorMsg}
-                <div class="text-white p-4 rounded mb-4 font-bold">
+                <div class="text-foreground p-4 rounded mb-4 font-bold">
                 Error: {errorMsg}
                 </div>
             {/if}
@@ -180,34 +181,31 @@
             <div class="mt-4 flex flex-col items-center text-xl gap-2 font-semibold">
                 <p>Total Hours Played: {gameStats.totalPlaytime ? formatDuration(gameStats.totalPlaytime) : "00:00:00"}</p>
                 <p>Total Sessions: {gameStats.totalSessions || 0}</p>
-                <p>Last Played: {formatLocaleDate(String(gameStats.lastPlayed))}</p>
+                <p>Last Played: {gameStats.lastPlayed ? formatLocaleDate(gameStats.lastPlayed) : "Never"}</p>
 
-                <ButtonGroup>
-                    <RadioButton onclick={() => updateStatus("played")} outline checkedClass="outline-2 outline-blue-500" class="cursor-pointer" value="played" bind:group={radioGroup}>Played</RadioButton >
-                    <RadioButton onclick={() => updateStatus("playing")} outline checkedClass="outline-2 outline-blue-500" class="cursor-pointer" value="playing" bind:group={radioGroup}>Playing</RadioButton >
-                    <RadioButton onclick={() => updateStatus("backlog")} outline checkedClass="outline-2 outline-blue-500" class="cursor-pointer" value="backlog" bind:group={radioGroup}>Backlog</RadioButton >
-                </ButtonGroup>
+                <RadioGroup.Root value={radioGroup} onValueChange={(value) => { radioGroup = value; updateStatus(value); }} class="flex flex-wrap gap-4" aria-label="Game status">
+                    {#each ["played", "playing", "backlog"] as status}
+                        <div class="flex items-center gap-2">
+                            <RadioGroup.Item id={"status-" + status} value={status} />
+                            <Label for={"status-" + status} class="cursor-pointer capitalize">{status}</Label>
+                        </div>
+                    {/each}
+                </RadioGroup.Root>
             </div>
         </div>
 
         <!--TABS BAR SECTION-->
         <div class="w-full md:w-2/3 overflow-x-auto">
-            <Tabs tabStyle="underline" class="text-blue-500" classes={{divider: "bg-blue-500!", content: "bg-primary!"}} >
-                  
-                <!--The tab items are imported components to reduce clutter-->
-                <TabItem title="Sessions" classes={{ button:"cursor-pointer"}}> 
-                    <SessionList bind:sessions/>
-                </TabItem>
-                
-                <TabItem title="Timeline" classes={{ button:"cursor-pointer"}}> 
-                    <SessionTimeline {sessions}/>
-                </TabItem>
-                
-                <TabItem title="Stats" classes={{ button:"cursor-pointer"}}>
-                    <Stats {sessions}/>
-                </TabItem>
-                
-            </Tabs>
+            <Tabs.Root value="sessions">
+                <Tabs.List class="mb-4">
+                    <Tabs.Trigger value="sessions">Sessions</Tabs.Trigger>
+                    <Tabs.Trigger value="timeline">Timeline</Tabs.Trigger>
+                    <Tabs.Trigger value="stats">Stats</Tabs.Trigger>
+                </Tabs.List>
+                <Tabs.Content value="sessions"><SessionList bind:sessions /></Tabs.Content>
+                <Tabs.Content value="timeline"><SessionTimeline {sessions} /></Tabs.Content>
+                <Tabs.Content value="stats"><Stats {sessions} /></Tabs.Content>
+            </Tabs.Root>
         </div>
     </div>
 </main>

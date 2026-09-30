@@ -1,6 +1,7 @@
 <script lang="ts">
     import { formatDuration, formatLocaleDate, formatTime } from "$lib/timeFormatting.js";
-    import { Chart } from "@flowbite-svelte-plugins/chart";
+    import Chart from "$lib/components/ApexChart.svelte";
+    import * as Card from "$lib/components/ui/card";
     import type { Session } from "$lib/types";
     import type { ApexOptions } from "apexcharts";
     import { fade } from "svelte/transition"; 
@@ -137,15 +138,11 @@
         // Replace the raw numbers with the HH:MM:SS strings on hover/labels
         dataLabels: {
             enabled: true,
-            formatter: function (_value, { dataPointIndex }) {
-                return longestSessions.durationsString[dataPointIndex];
-            }
+            formatter: (value) => formatDuration(Number(value))
         },
         tooltip: {
             y: {
-                formatter: function (_value, { dataPointIndex }) {
-                    return longestSessions.durationsString[dataPointIndex];
-                }
+                formatter: (value) => formatDuration(value)
             }
         }
     });
@@ -172,16 +169,21 @@
 </script>
 
 
-<div in:fade={{ duration: 75 }}>
-    <!--Last 7 sessions chart-->
-    <h5 class="pb-1 text-2xl leading-none font-bold text-white">Last 7 Sessions</h5>
-    <Chart options={recentOptions} />
-
-    <!--Longest 5 sessions chart-->
-    <h5 class="pb-1 text-2xl leading-none font-bold text-white">Longest 5 Sessions</h5>
-    <Chart options={longestOptions} />
-
-    <!--Most common days played chart-->
-    <h5 class="pb-1 text-2xl leading-none font-bold text-white">Most Common Days Played</h5>
-    <Chart options={mostPlayedDaysOptions} />
+<div class="space-y-6" in:fade={{ duration: 75 }}>
+    {#if sessions.length === 0}
+        <p class="py-8 text-muted-foreground">No sessions recorded yet.</p>
+    {:else}
+        <Card.Root>
+            <Card.Header><Card.Title>Recent Session Frequency</Card.Title><Card.Description>Session counts across the last seven dates with activity.</Card.Description></Card.Header>
+            <Card.Content><Chart options={recentOptions} /></Card.Content>
+        </Card.Root>
+        <Card.Root>
+            <Card.Header><Card.Title>Longest 5 Sessions</Card.Title></Card.Header>
+            <Card.Content><Chart options={longestOptions} /></Card.Content>
+        </Card.Root>
+        <Card.Root>
+            <Card.Header><Card.Title>Most Common Days Played</Card.Title></Card.Header>
+            <Card.Content><Chart options={mostPlayedDaysOptions} /></Card.Content>
+        </Card.Root>
+    {/if}
 </div>

@@ -1,25 +1,10 @@
 <script lang="ts">
-  import "../app.css"
-
-  import {
-    FloatingLabelInput,
-    Textarea,
-    Button,
-    Helper,
-  } from "flowbite-svelte";
-
-  import {
-    Table,
-    TableBody,
-    TableBodyCell,
-    TableBodyRow,
-    TableHead,
-    TableHeadCell,
-  } from "flowbite-svelte";
-
-  import PlaySolid from "flowbite-svelte-icons/PlaySolid.svelte";
-  import PauseSolid from "flowbite-svelte-icons/PauseSolid.svelte";
-  import StopSolid from "flowbite-svelte-icons/StopSolid.svelte";
+  import { Button } from "$lib/components/ui/button";
+  import { Input } from "$lib/components/ui/input";
+  import { Label } from "$lib/components/ui/label";
+  import { Textarea } from "$lib/components/ui/textarea";
+  import * as Table from "$lib/components/ui/table";
+  import { Play, Pause, Square, X } from "@lucide/svelte";
 
   import { tracker } from "./sessionTracker.svelte.js";
 
@@ -32,128 +17,71 @@
 
 </script>
 
-<main
-  class="min-h-screen flex flex-col justify-center items-center gap-8 text-white"
->
-  <!--STOPWATCH DISPLAY-->
-  <form class="flex flex-col items-center" onsubmit={tracker.searchProcesses}>
-    <h2 class="text-4xl font-bold mb-8 text-center">{tracker.headerMessage}</h2>
-    <!--Displays stopwatch if gameFound is true-->
+<main class="mx-auto flex min-h-[calc(100vh-5rem)] max-w-3xl flex-col items-center justify-center gap-8 px-4 py-12">
+  <form class="flex w-full max-w-md flex-col items-center" onsubmit={tracker.searchProcesses}>
+    <h2 class="mb-8 text-center text-4xl font-bold">{tracker.headerMessage}</h2>
     {#if tracker.gameFound}
-      <h3 class="text-2xl font-bold mb-4">{tracker.stopwatchDisplay}</h3>
-
-        <div class="h-8 flex items-center justify-center">
-          {#if tracker.paused && Object.keys(tracker.sessionData).length == 0}
-              <h4 class="text-2xl font-bold">Session Paused!</h4>
-          {/if}
-        </div>
-
-        <div class="grid grid-cols-2 gap-2 items-center justify-center">
-
-          <!--Displays resume button if tracker is paused-->
-          {#if tracker.paused && Object.keys(tracker.sessionData).length == 0}
-            <Button onclick={tracker.resumeSession} outline color="blue" class="w-24 mt-4 cursor-pointer transition-colors">
-              Resume
-              <PlaySolid/>
-            </Button>
-
-          <!--Displays paused button if tracker is running-->
-          {:else if !tracker.paused && Object.keys(tracker.sessionData).length == 0}
-            <Button onclick={tracker.pauseSession} outline color="blue" class="w-24 mt-4 cursor-pointer transition-colors">
-              Pause
-              <PauseSolid/>
-            </Button>
-          {/if}
-
-          <!--Stop session button-->
-          {#if Object.keys(tracker.sessionData).length == 0}
-            <Button onclick={tracker.userStopSession} outline color="blue" class="w-24 mt-4 cursor-pointer transition-colors">
-              Stop
-            <StopSolid/>
-            </Button>
-          {/if}
-
-        </div>
-    <!--GAME SEARCH SECTION-->
-    {:else if !tracker.gameFound}
-      <FloatingLabelInput
-        class="w-96"
-        color="blue"
-        clearable
-        clearableColor="blue"
-        variant="outlined"
-        id="game-input"
-        bind:value={tracker.gameInput}
-        type="text"
-        classes={{ label: "!bg-primary", close:"cursor-pointer transition-colors" }}
-        required
-      >
-        Enter a name...
-      </FloatingLabelInput>
-      <div class="min-h-4 items-end">
-        {#if tracker.errorFlag}
-          <Helper color="red">
-            <span class="font-medium text-left">{tracker.errorMsg}</span>
-          </Helper>
+      <h3 class="mb-4 font-mono text-2xl font-bold tabular-nums" role="timer">{tracker.stopwatchDisplay}</h3>
+      <div class="flex h-8 items-center justify-center">
+        {#if tracker.paused && Object.keys(tracker.sessionData).length === 0}
+          <h4 class="text-xl font-semibold">Session Paused!</h4>
         {/if}
       </div>
-      <Button type="submit" outline color="blue" class="mt-4 cursor-pointer transition-colors"
-        >Enter</Button
-      >
-      {#if tracker.successMsg.length > 0}
-        <p>{tracker.successMsg}</p>
+      {#if Object.keys(tracker.sessionData).length === 0}
+        <div class="mt-4 flex gap-2">
+          {#if tracker.paused}
+            <Button type="button" variant="outline" onclick={tracker.resumeSession}><Play /> Resume</Button>
+          {:else}
+            <Button type="button" variant="outline" onclick={tracker.pauseSession}><Pause /> Pause</Button>
+          {/if}
+          <Button type="button" variant="outline" onclick={tracker.userStopSession}><Square /> Stop</Button>
+        </div>
       {/if}
-      <!--Displays a table of search results if there are any results-->
+    {:else}
+      <div class="w-full space-y-2">
+        <Label for="game-input">Game or process name</Label>
+        <div class="flex gap-2">
+          <Input id="game-input" bind:value={tracker.gameInput} placeholder="Enter a name..." required aria-invalid={tracker.errorFlag} aria-describedby={tracker.errorFlag ? "search-error" : undefined} />
+          <Button type="button" variant="outline" size="icon" aria-label="Clear game name" onclick={() => tracker.gameInput = ""}><X /></Button>
+        </div>
+        {#if tracker.errorFlag}
+          <p id="search-error" class="text-sm text-destructive" role="alert">{tracker.errorMsg}</p>
+        {/if}
+      </div>
+      <Button type="submit" class="mt-4">Enter</Button>
+      {#if tracker.successMsg.length > 0}
+        <p class="mt-3 text-sm" role="status">{tracker.successMsg}</p>
+      {/if}
       {#if tracker.searchSuccessful}
-        <Table hoverable={true} class="mt-4 w-96">
-        <caption class="p-2 text-left text-lg font-semibold">Results</caption>
-          <TableHead color="primary">
-            <TableHeadCell>PID</TableHeadCell>
-            <TableHeadCell>Name</TableHeadCell>
-          </TableHead>
-          <TableBody class="cursor-pointer">
-            {#each tracker.searchResults as process}
-            <!--trackSession function is called when a search result is clicked-->
-              <TableBodyRow onclick={() => tracker.trackSession({pid: process.pid, name: process.name})} class="bg-primary! border-blue-500! hover:bg-gray-800! cursor-pointer transition-colors">
-                <TableBodyCell>{process.pid}</TableBodyCell>
-                <TableBodyCell>{process.name}</TableBodyCell>
-              </TableBodyRow>
-            {/each}
-          </TableBody>
-        </Table>
+        <div class="mt-6 w-full rounded-lg border">
+          <Table.Root>
+            <Table.Caption>Results — choose a process to track</Table.Caption>
+            <Table.Header><Table.Row><Table.Head>PID</Table.Head><Table.Head>Name</Table.Head></Table.Row></Table.Header>
+            <Table.Body>
+              {#each tracker.searchResults as process}
+                <Table.Row>
+                  <Table.Cell>{process.pid}</Table.Cell>
+                  <Table.Cell><Button type="button" variant="ghost" class="h-auto justify-start whitespace-normal text-left" onclick={() => tracker.trackSession({ pid: process.pid, name: process.name })}>{process.name}</Button></Table.Cell>
+                </Table.Row>
+              {/each}
+            </Table.Body>
+          </Table.Root>
+        </div>
       {/if}
     {/if}
   </form>
 
-  <!--ALT NAME AND NOTES SECTION-->
   {#if Object.keys(tracker.sessionData).length > 0}
-    <form class="flex flex-col items-center" onsubmit={tracker.endSession}>
-      <FloatingLabelInput
-        class="w-96 mb-3"
-        color="blue"
-        clearable
-        clearableColor="blue"
-        variant="outlined"
-        id="new-game-input"
-        bind:value={tracker.newGameInput}
-        type="text"
-        classes={{ label: "!bg-primary" }}
-      >
-        Enter a new title... (Optional)
-      </FloatingLabelInput>
-      <Textarea
-        id="notes-input"
-        class="p-2 rounded mb-2 mt-3 w-96 h-24 placeholder-blue-400!"
-        classes={{ wrapper: "!bg-primary" }}
-        placeholder="Enter session notes... (Optional)"
-        bind:value={tracker.sessionNotes}
-      />
-      <Button type="submit" outline color="blue" class="mt-4 cursor-pointer"
-        >Enter</Button
-      >
-      <p>
-        If you don't wish to enter any notes or overwrite entered title, click enter
-      </p>
+    <form class="flex w-full max-w-md flex-col gap-3" onsubmit={tracker.endSession}>
+      <Label for="new-game-input">New title (optional)</Label>
+      <div class="flex gap-2">
+        <Input id="new-game-input" bind:value={tracker.newGameInput} placeholder="Enter a new title..." />
+        <Button type="button" variant="outline" size="icon" aria-label="Clear new title" onclick={() => tracker.newGameInput = ""}><X /></Button>
+      </div>
+      <Label for="notes-input">Session notes (optional)</Label>
+      <Textarea id="notes-input" class="min-h-24" placeholder="Enter session notes..." bind:value={tracker.sessionNotes} />
+      <Button type="submit" class="self-center">Enter</Button>
+      <p class="text-center text-sm text-muted-foreground">Click Enter to save, even if you leave the title and notes empty.</p>
     </form>
   {/if}
 </main>
