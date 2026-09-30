@@ -1,189 +1,138 @@
 <script lang="ts">
-    import { formatDuration, formatLocaleDate, formatTime } from "$lib/timeFormatting.js";
-    import Chart from "$lib/components/ApexChart.svelte";
+    import { BarChart, PieChart } from "layerchart/svg";
+    import { scaleBand } from "d3-scale";
+    import * as Chart from "$lib/components/ui/chart";
     import * as Card from "$lib/components/ui/card";
+    import { formatDuration } from "$lib/timeFormatting";
+    import { getRecentActivity, getLongestSessions, getWeekdayPlaytime } from "$lib/sessionStats";
     import type { Session } from "$lib/types";
-    import type { ApexOptions } from "apexcharts";
-    import { fade } from "svelte/transition"; 
+    import { fade } from "svelte/transition";
 
-    // Sessions prop from gameInfo page.
     let { sessions }: { sessions: Session[] } = $props();
 
-    /** Function for getting the last 7 sessions*/
-    function getSessionRange(sessions: Session[]) {
-        let tally: Record<string, number> = {};
+    const recentConfig = {
+        sessions: { label: "Sessions", color: "var(--chart-1)" },
+    } satisfies Chart.ChartConfig;
+    const longestConfig = {
+        durationSeconds: { label: "Playtime", color: "var(--chart-2)" },
+    } satisfies Chart.ChartConfig;
+    const weekdayConfig = {
+        sunday: { label: "Sunday", color: "var(--chart-1)" },
+        monday: { label: "Monday", color: "var(--chart-2)" },
+        tuesday: { label: "Tuesday", color: "var(--chart-3)" },
+        wednesday: { label: "Wednesday", color: "var(--chart-4)" },
+        thursday: { label: "Thursday", color: "var(--chart-5)" },
+        friday: { label: "Friday", color: "var(--chart-6)" },
+        saturday: { label: "Saturday", color: "var(--chart-7)" },
+    } satisfies Chart.ChartConfig;
 
-        for (const session of sessions) {
-            let dateStr = formatLocaleDate(session.startTs)
-            
-            // If more than one session is recorded on a single day, tally increments for the specific day.
-            if (tally[dateStr]) {
-                tally[dateStr] += 1;
-            } else {
-                tally[dateStr] = 1;
-            }
-        }
-
-        // Both arrays are reduced to seven entries.
-        let dates = Object.keys(tally).slice(-7);
-        let counts = Object.values(tally).slice(-7);
-
-        // Both arrays are returned as an object.
-        return { dates, counts };
-    }
-
-    /** Function for getting the top 5 longest sessions by game*/
-    function getLongestSessions(sessions: Session[]) {
-
-        // Sessions are sorted by duration descending.
-        let sortedSessions = [...sessions].sort((a, b) => b.durationSeconds - a.durationSeconds);
-
-        // The top five longest sessions are obtained.
-        let topFive = sortedSessions.slice(0, 5);
-
-        // The dates of the longest sessions are obtained.
-        let dates = topFive.map(session => formatLocaleDate(session.startTs));
-
-        // The durations of the longest sessions are obtained.
-        let durationsSeconds = topFive.map(session => session.durationSeconds);
-        
-        // The durations are formatted into HH:MM:SS
-        let durationsString = durationsSeconds.map(sec => formatDuration(sec));
-
-        // Return all three arrays
-        return { dates, durationsSeconds, durationsString };
-    }
-
-    /** Function for getting the most played days for a specific game measured by hours played*/
-    function getMostPlayedDays(sessions: Session[]) {
-        let daysString = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-        
-        // A record for storing the days of the week and the total hours played on those days.
-        let ledger: Record<string, number> = {
-            "Sunday": 0,
-            "Monday": 0,
-            "Tuesday": 0,
-            "Wednesday": 0,
-            "Thursday": 0,
-            "Friday": 0,
-            "Saturday": 0,
-        };
-
-
-        for (const session of sessions) {
-
-            // Gets the day of the week from the start timestamp.
-            let day = new Date(session.startTs).getDay();
-
-            // Adds duration seconds onto the record item corresponding to the day of the week of the timestamp.
-            ledger[daysString[day]] += session.durationSeconds;    
-        }
-
-        // Extracts the days from the record.
-        let days = Object.keys(ledger);
-
-        // Extracts the durations from the record and formats them to hours.
-        let hours = Object.values(ledger).map(seconds => Math.round((seconds / 3600) * 10) / 10);
-
-        // Returns days and hours as an object.
-        return {days, hours};
-    }
-
-    let recentSessions = $derived(getSessionRange(sessions));
-
+    let recentSessions = $derived(getRecentActivity(sessions));
     let longestSessions = $derived(getLongestSessions(sessions));
-
-    let mostPlayedDays = $derived(getMostPlayedDays(sessions));
-
-    // The options for the last 7 sessions chart.
-    let recentOptions = $derived<ApexOptions>({
-        chart: {
-            type: "bar",
-            height: "300px",
-        },
-        series: [
-            {
-                name: "Sessions",
-                data: recentSessions.counts,
-            }
-        ],
-        xaxis: {
-            categories: recentSessions.dates
-        },
-    });
-
-    // The options for the top 5 longest sessions chart.
-    let longestOptions = $derived<ApexOptions>({
-        chart: {
-            type: "bar",
-            height: "300px",
-        },
-        plotOptions: {
-            bar: {
-                horizontal: true,
-            }
-        },
-        series: [
-            {
-                name: "Playtime",
-                data: longestSessions.durationsSeconds,
-            }
-        ],
-        xaxis: {
-            categories: longestSessions.dates,
-            labels: {
-                show: false 
-            }
-        },
-        // Replace the raw numbers with the HH:MM:SS strings on hover/labels
-        dataLabels: {
-            enabled: true,
-            formatter: (value) => formatDuration(Number(value))
-        },
-        tooltip: {
-            y: {
-                formatter: (value) => formatDuration(value)
-            }
-        }
-    });
-
-    // Options for the most played days chart.
-    let mostPlayedDaysOptions = $derived<ApexOptions>({
-        chart: {
-            type: "pie",
-            height: "300px",
-        },
-        labels: mostPlayedDays.days,
-
-        series: mostPlayedDays.hours,
-        
-        // Appends 'Hours' onto the hour counts for clarificaton.
-        yaxis: {
-            labels: {
-                formatter: function (value) {
-                    return value + " Hours";
-                }
-            }
-        }
-    });
+    let weekdayPlaytime = $derived(getWeekdayPlaytime(sessions));
+    let hasPlaytime = $derived(weekdayPlaytime.some((day) => day.seconds > 0));
 </script>
 
+{#snippet durationValue({ value, name }: { value: unknown; name: string })}
+    <span class="text-muted-foreground">{name}</span>
+    <span class="ml-auto font-mono font-medium tabular-nums">{formatDuration(Math.round(Number(value)))}</span>
+{/snippet}
 
 <div class="space-y-6" in:fade={{ duration: 75 }}>
     {#if sessions.length === 0}
         <p class="py-8 text-muted-foreground">No sessions recorded yet.</p>
     {:else}
         <Card.Root>
-            <Card.Header><Card.Title>Recent Session Frequency</Card.Title><Card.Description>Session counts across the last seven dates with activity.</Card.Description></Card.Header>
-            <Card.Content><Chart options={recentOptions} /></Card.Content>
+            <Card.Header>
+                <Card.Title>Recent Session Frequency</Card.Title>
+                <Card.Description>Session counts across the last seven dates with activity.</Card.Description>
+            </Card.Header>
+            <Card.Content>
+                <Chart.Container config={recentConfig} class="aspect-auto h-[300px] w-full" aria-label="Session counts on the seven most recent active days">
+                    <BarChart
+                        data={recentSessions}
+                        x="day"
+                        y="sessions"
+                        xScale={scaleBand().padding(0.25)}
+                        xDomain={recentSessions.map((day) => day.day)}
+                        yDomain={[0, null]}
+                        yNice
+                        series={[{ key: "sessions", label: recentConfig.sessions.label, color: "var(--color-sessions)" }]}
+                        props={{
+                            xAxis: { format: (day) => recentSessions.find((item) => item.day === String(day))?.date ?? String(day) },
+                            yAxis: { format: (count) => Number.isInteger(Number(count)) ? String(count) : "" },
+                        }}
+                    >
+                        {#snippet tooltip({ context })}
+                            <Chart.Tooltip label={context.tooltip.data?.date} />
+                        {/snippet}
+                    </BarChart>
+                </Chart.Container>
+                <ul class="sr-only">
+                    {#each recentSessions as day}<li>{day.date}: {day.sessions} sessions</li>{/each}
+                </ul>
+            </Card.Content>
         </Card.Root>
+
         <Card.Root>
             <Card.Header><Card.Title>Longest 5 Sessions</Card.Title></Card.Header>
-            <Card.Content><Chart options={longestOptions} /></Card.Content>
+            <Card.Content>
+                <Chart.Container config={longestConfig} class="aspect-auto h-[300px] w-full" aria-label="Five longest sessions by playtime">
+                    <BarChart
+                        data={longestSessions}
+                        orientation="horizontal"
+                        x="durationSeconds"
+                        y="key"
+                        yScale={scaleBand().padding(0.25)}
+                        yDomain={longestSessions.map((session) => session.key)}
+                        xDomain={[0, null]}
+                        axis="y"
+                        labels={{ placement: "outside", value: "durationSeconds", format: (value) => formatDuration(Math.round(Number(value))) }}
+                        padding={{ left: 85, right: 70 }}
+                        series={[{ key: "durationSeconds", label: longestConfig.durationSeconds.label, color: "var(--color-durationSeconds)" }]}
+                        props={{
+                            yAxis: { format: (key) => longestSessions.find((session) => session.key === String(key))?.date ?? String(key) },
+                        }}
+                    >
+                        {#snippet tooltip({ context })}
+                            <Chart.Tooltip label={context.tooltip.data?.date} formatter={durationValue} />
+                        {/snippet}
+                    </BarChart>
+                </Chart.Container>
+                <ul class="sr-only">
+                    {#each longestSessions as session}<li>{session.date}: {formatDuration(session.durationSeconds)}</li>{/each}
+                </ul>
+            </Card.Content>
         </Card.Root>
+
         <Card.Root>
-            <Card.Header><Card.Title>Most Common Days Played</Card.Title></Card.Header>
-            <Card.Content><Chart options={mostPlayedDaysOptions} /></Card.Content>
+            <Card.Header>
+                <Card.Title>Most Common Days Played</Card.Title>
+                <Card.Description>Playtime grouped by the day each session started.</Card.Description>
+            </Card.Header>
+            <Card.Content>
+                {#if hasPlaytime}
+                    <Chart.Container config={weekdayConfig} class="aspect-auto h-[350px] w-full" aria-label="Playtime by weekday">
+                        <PieChart
+                            data={weekdayPlaytime}
+                            key="key"
+                            label="label"
+                            value="seconds"
+                            legend={{ placement: "bottom", classes: { root: "w-full", items: "justify-center gap-x-4 gap-y-2" } }}
+                            padding={{ bottom: 80 }}
+                            cRange={weekdayPlaytime.map((day) => weekdayConfig[day.key as keyof typeof weekdayConfig].color)}
+                        >
+                            {#snippet tooltip({ context })}
+                                <Chart.Tooltip label={context.tooltip.data?.label} formatter={durationValue} />
+                            {/snippet}
+                        </PieChart>
+                    </Chart.Container>
+                {:else}
+                    <p class="py-8 text-muted-foreground">No playtime recorded yet.</p>
+                {/if}
+                <ul class="sr-only" aria-label="Weekday playtime">
+                    {#each weekdayPlaytime as day}<li>{day.label}: {formatDuration(day.seconds)}</li>{/each}
+                </ul>
+            </Card.Content>
         </Card.Root>
     {/if}
 </div>
