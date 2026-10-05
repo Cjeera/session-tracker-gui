@@ -11,8 +11,8 @@
     import SessionList from "./SessionList.svelte";
     import SessionTimeline from "./SessionTimeline.svelte";
     import Stats from "./Stats.svelte";
-    import { formatDuration, formatLocaleDate } from "$lib/timeFormatting";
-    import type { GameCover, Game, GameStats, Session } from "$lib/types";
+    import { formatDuration, formatLocaleDate, formatTime } from "$lib/timeFormatting";
+    import type { GameCover, Game, GameStats, Session, GameTimeRangeStats } from "$lib/types";
 
     interface RouteParams {
         gameId: string;
@@ -27,6 +27,9 @@
     // Data stores for the fetched backend information
     let game = $state<Partial<Game>>({});
     let gameStats = $state<Partial<GameStats>>({});
+    let gameWeeklyStats = $state<Partial<GameTimeRangeStats[]>>([]);
+    let gameMonthlyStats = $state<Partial<GameTimeRangeStats[]>>([]);
+    let gameYearlyStats = $state<Partial<GameTimeRangeStats[]>>([]);
     let sessions = $state<Session[]>([]);
     let covers = $state<GameCover[]>([]);
 
@@ -74,13 +77,19 @@
         // Reset state before fetching
         errorMsg = "";
         gameStats = {};
+        gameWeeklyStats = [];
+        gameMonthlyStats = [];
+        gameYearlyStats = [];
 
         try {
             // Convert the URL string ID into a number
             let numericId = Number(rawId);
             
             // Await the stats payload from the Rust backend
-            gameStats = await invoke("get_game_stats", { gameId: numericId });
+            gameStats = await invoke("get_game_stats", { gameId: numericId });      
+            gameWeeklyStats = await invoke("get_game_weekly_stats", { gameId: numericId });
+            gameMonthlyStats = await invoke("get_game_monthly_stats", { gameId: numericId });
+            gameYearlyStats = await invoke("get_game_yearly_stats", { gameId: numericId });
             
         } catch (error) {
             errorMsg = String(error);
@@ -160,7 +169,7 @@
                     {#if errorMsg}<p class="text-destructive" role="alert">{errorMsg}</p>{/if}
                     <div class="grid grid-cols-2 gap-4 md:grid-cols-4">
                         {#each covers as cover}
-                            <button class="overflow-hidden rounded-md border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Use this cover for {game.title}" onclick={() => insertNewCover(cover, Number(game.gameId), false)}>
+                            <button class="hover:opacity-70 cursor-pointer active:translate-y-2 transition-all overflow-hidden rounded-md border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label="Use this cover for {game.title}" onclick={() => insertNewCover(cover, Number(game.gameId), false)}>
                                 <img src={cover.cover?.url} alt="{game.title} alternate cover" class="aspect-3/4 w-full object-cover" />
                             </button>
                         {/each}
@@ -180,13 +189,16 @@
 
             <div class="mt-4 flex flex-col items-center text-xl gap-2 font-semibold">
                 <p>Total Hours Played: {gameStats.totalPlaytime ? formatDuration(gameStats.totalPlaytime) : "00:00:00"}</p>
+                <p>Average Session Length: {gameStats.averageSessionLength ? formatDuration(gameStats.averageSessionLength) : "00:00:00"}</p>
                 <p>Total Sessions: {gameStats.totalSessions || 0}</p>
-                <p>Last Played: {gameStats.lastPlayed ? formatLocaleDate(gameStats.lastPlayed) : "Never"}</p>
+                <p>Average Start Time: {gameStats.averageStartTime ?? "Not Played"}</p>
+                <p>Average End Time: {gameStats.averageEndTime ?? "Not Played"}</p>
+                <p>Last Played: {gameStats.lastPlayed ? formatLocaleDate(gameStats.lastPlayed) : "Not Played"}</p>
 
                 <RadioGroup.Root value={radioGroup} onValueChange={(value) => { radioGroup = value; updateStatus(value); }} class="flex flex-wrap gap-4" aria-label="Game status">
                     {#each ["played", "playing", "backlog"] as status}
                         <div class="flex items-center gap-2">
-                            <RadioGroup.Item id={"status-" + status} value={status} />
+                            <RadioGroup.Item id={"status-" + status} value={status} class="cursor-pointer" />
                             <Label for={"status-" + status} class="cursor-pointer capitalize">{status}</Label>
                         </div>
                     {/each}
