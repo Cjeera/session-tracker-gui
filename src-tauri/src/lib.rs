@@ -5,7 +5,7 @@ pub mod api_requests;
 
 use crate::api_requests::{get_cover_art, GameCover};
 use crate::session_tracker::{track_session, end_session, process_search, Process};
-use crate::database_operations::{get_games, get_stats, get_sessions, get_game_by_id, edit_session_notes, insert_cover_art, update_status, Session, SessionRust, Game, GameStats};
+use crate::database_operations::{get_games, get_stats, get_sessions, get_game_by_id, edit_session_notes, insert_cover_art, update_status, get_game_weekly_playtime, get_game_monthly_playtime, get_game_yearly_playtime, get_global_weekly_playtime, get_global_monthly_playtime, get_global_yearly_playtime, Session, SessionRust, Game, GameStats, GameTimeRangeStats, GlobalTimeRangeStats};
 use crate::error::AppError;
 use tauri::{AppHandle, Builder, Manager};
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
@@ -32,6 +32,66 @@ fn get_game_stats(game_id: i64) -> Result<GameStats, AppError>
     match get_stats(game_id)
     {
         Ok(game_stats) => Ok(game_stats),
+        Err(error) => Err(error),
+    }
+}
+
+#[tauri::command]
+fn get_game_weekly_stats(game_id: i64) -> Result<Vec<GameTimeRangeStats>, AppError>
+{
+    match get_game_weekly_playtime(game_id)
+    {
+        Ok(stats) => Ok(stats),
+        Err(error) => Err(error),
+    }
+}
+
+#[tauri::command]
+fn get_game_monthly_stats(game_id: i64) -> Result<Vec<GameTimeRangeStats>, AppError>
+{
+    match get_game_monthly_playtime(game_id)
+    {
+        Ok(stats) => Ok(stats),
+        Err(error) => Err(error),
+    }
+}
+
+#[tauri::command]
+fn get_game_yearly_stats(game_id: i64) -> Result<Vec<GameTimeRangeStats>, AppError>
+{
+    match get_game_yearly_playtime(game_id)
+    {
+        Ok(stats) => Ok(stats),
+        Err(error) => Err(error),
+    }
+}
+
+#[tauri::command]
+fn get_global_weekly_stats() -> Result<Vec<GlobalTimeRangeStats>, AppError>
+{
+    match get_global_weekly_playtime()
+    {
+        Ok(stats) => Ok(stats),
+        Err(error) => Err(error),
+    }
+}
+
+#[tauri::command]
+fn get_global_monthly_stats() -> Result<Vec<GlobalTimeRangeStats>, AppError>
+{
+    match get_global_monthly_playtime()
+    {
+        Ok(stats) => Ok(stats),
+        Err(error) => Err(error),
+    }
+}
+
+#[tauri::command]
+fn get_global_yearly_stats() -> Result<Vec<GlobalTimeRangeStats>, AppError>
+{
+    match get_global_yearly_playtime()
+    {
+        Ok(stats) => Ok(stats),
         Err(error) => Err(error),
     }
 }
@@ -176,7 +236,13 @@ pub fn run() {
             end_tracker, 
             search_processes, 
             get_game_list, 
-            get_game_stats, 
+            get_game_stats,
+            get_game_weekly_stats,
+            get_game_monthly_stats,
+            get_game_yearly_stats, 
+            get_global_weekly_stats,
+            get_global_monthly_stats,
+            get_global_yearly_stats,
             get_game_sessions, 
             get_single_game,
             toggle_pause,
