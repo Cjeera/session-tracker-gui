@@ -2,13 +2,13 @@
     import { onMount } from 'svelte';
     import { page } from "$app/state";
     import "../app.css";
-    import { Button } from "#lib/components/ui/button/index.js";
+    import { Button } from "#lib/components/ui/button/index.ts";
     
     // Import the Tauri plugins
     import { check } from '@tauri-apps/plugin-updater';
     import { ask, message } from '@tauri-apps/plugin-dialog';
     import { relaunch } from '@tauri-apps/plugin-process';
-    import { tracker } from "./sessionTracker.svelte.js";
+    import { tracker } from "./sessionTracker.svelte.ts";
     import { getCurrentWindow } from "@tauri-apps/api/window";
 
     let { children } = $props();
