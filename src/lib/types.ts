@@ -22,11 +22,25 @@ export interface Game {
 }
 
 export interface GameStats {
-        gameId: number;
-        totalPlaytime: number;
-        totalSessions: number;
-        lastPlayed: string;
-    }
+    gameId: number;
+    totalPlaytime: number;
+    totalSessions: number;
+    lastPlayed: string;
+    averageSessionLength: number;
+    averageStartTime: string | null;
+    averageEndTime: string | null;
+}
+
+export interface GameTimeRangeStats {
+    gameId: number;
+    range: string;
+    totalPlaytime: number;
+}
+
+export interface GlobalTimeRangeStats {
+    range: string;
+    totalPlaytime: number;
+}
 
 export interface Process {
         pid: number;
