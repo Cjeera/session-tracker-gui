@@ -1,10 +1,10 @@
 <script lang="ts">
     import { BarChart, PieChart } from "layerchart/svg";
-    import * as Chart from "$lib/components/ui/chart";
-    import * as Card from "$lib/components/ui/card";
-    import { formatDuration } from "$lib/timeFormatting";
+    import * as Chart from "#lib/components/ui/chart/index.js";
+    import * as Card from "#lib/components/ui/card/index.js";
+    import { formatDuration } from "#lib/timeFormatting.js";
     import { getRecentActivity, getLongestSessions, getWeekdayPlaytime } from "#lib/sessionStats";
-    import type { Session } from "$lib/types";
+    import type { Session } from "#lib/types.js";
     import { fade } from "svelte/transition";
 
     let { sessions }: { sessions: Session[] } = $props();

@@ -2,7 +2,7 @@
     import { onMount } from 'svelte';
     import { page } from "$app/state";
     import "../app.css";
-    import { Button } from "$lib/components/ui/button";
+    import { Button } from "#lib/components/ui/button/index.js";
     
     // Import the Tauri plugins
     import { check } from '@tauri-apps/plugin-updater';

@@ -1,6 +1,6 @@
 <script lang="ts">
-    import { formatDate } from "$lib/timeFormatting";
-    import type { Session } from "$lib/types";
+    import { formatDate } from "#lib/timeFormatting.js";
+    import type { Session } from "#lib/types.js";
     import { fade } from "svelte/transition";
     let { sessions }: { sessions: Session[] } = $props();
 </script>

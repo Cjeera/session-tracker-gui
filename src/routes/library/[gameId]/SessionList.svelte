@@ -1,11 +1,11 @@
 <script lang="ts">
-    import { Textarea } from "$lib/components/ui/textarea";
-    import { Button } from "$lib/components/ui/button";
-    import { Label } from "$lib/components/ui/label";
-    import * as Select from "$lib/components/ui/select";
-    import * as Table from "$lib/components/ui/table";
+    import { Textarea } from "#lib/components/ui/textarea/index.js";
+    import { Button } from "#lib/components/ui/button/index.js";
+    import { Label } from "#lib/components/ui/label/index.js";
+    import * as Select from "#lib/components/ui/select/index.js";
+    import * as Table from "#lib/components/ui/table/index.js";
     import { ArrowUpDown, ArrowUp, ArrowDown } from "@lucide/svelte";
-    import { getSessionRows, getSessionPage, type SessionRow, type SessionColumn, type SortDirection } from "$lib/sessionTable";
+    import { getSessionRows, getSessionPage, type SessionRow, type SessionColumn, type SortDirection } from "#lib/sessionTable.js";
     import { fade } from "svelte/transition";
 
     import {
@@ -13,9 +13,9 @@
         formatTime,
         formatDuration,
         formatLocaleDate,
-    } from "$lib/timeFormatting";
+    } from "#lib/timeFormatting.js";
 
-    import type { Session } from "$lib/types";
+    import type { Session } from "#lib/types.js";
 
 
 

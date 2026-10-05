@@ -1,9 +1,9 @@
 <script lang="ts">
-    import * as Card from "$lib/components/ui/card";
+    import * as Card from "#lib/components/ui/card/index.js";
     import { onMount } from "svelte";
     import { invoke } from "@tauri-apps/api/core";
-    import type { Game, GameCover } from "$lib/types";
-    import { config } from "$lib/types";
+    import type { Game, GameCover } from "#lib/types.js";
+    import { config } from "#lib/types.js";
     import { ask } from "@tauri-apps/plugin-dialog";
 
     // Component state variables

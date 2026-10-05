@@ -1,9 +1,9 @@
 <script lang="ts">
-    import * as Tabs from "$lib/components/ui/tabs";
-    import * as Dialog from "$lib/components/ui/dialog";
-    import * as RadioGroup from "$lib/components/ui/radio-group";
-    import { Label } from "$lib/components/ui/label";
-    import { Button } from "$lib/components/ui/button";
+    import * as Tabs from "#lib/components/ui/tabs/index.js";
+    import * as Dialog from "#lib/components/ui/dialog/index.js";
+    import * as RadioGroup from "#lib/components/ui/radio-group/index.js";
+    import { Label } from "#lib/components/ui/label/index.js";
+    import { Button } from "#lib/components/ui/button/index.js";
     import { invoke } from "@tauri-apps/api/core";
     import { page } from "$app/state";
     
@@ -11,8 +11,8 @@
     import SessionList from "./SessionList.svelte";
     import SessionTimeline from "./SessionTimeline.svelte";
     import Stats from "./Stats.svelte";
-    import { formatDuration, formatLocaleDate, formatTime } from "$lib/timeFormatting";
-    import type { GameCover, Game, GameStats, Session, GameTimeRangeStats } from "$lib/types";
+    import { formatDuration, formatLocaleDate, formatTime } from "#lib/timeFormatting.js";
+    import type { GameCover, Game, GameStats, Session, GameTimeRangeStats } from "#lib/types.js";
 
     interface RouteParams {
         gameId: string;

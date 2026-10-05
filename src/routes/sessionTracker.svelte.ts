@@ -1,7 +1,7 @@
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import type { UnlistenFn } from "@tauri-apps/api/event";
-import type { SessionRust, Process } from "$lib/types";
+import type { SessionRust, Process } from "#lib/types.js";
 
 // A class containing all session tracking logic.
 class SessionTracker {
