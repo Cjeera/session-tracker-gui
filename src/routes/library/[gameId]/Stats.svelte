@@ -28,7 +28,8 @@
     let recentSessions = $derived(getRecentActivity(sessions));
     let longestSessions = $derived(getLongestSessions(sessions));
     let weekdayPlaytime = $derived(getWeekdayPlaytime(sessions));
-    let hasPlaytime = $derived(weekdayPlaytime.some((day) => day.seconds > 0));
+    let totalWeekdayPlaytime = $derived(weekdayPlaytime.reduce((total, day) => total + day.seconds, 0));
+    let hasPlaytime = $derived(totalWeekdayPlaytime > 0);
 </script>
 
 {#snippet durationValue({ value, name }: { value: unknown; name: string })}
@@ -116,6 +117,14 @@
                             key="key"
                             label="label"
                             value="seconds"
+                            labels={{
+                                placement: "centroid",
+                                value: (day: { seconds: number }) => day.seconds > 0 && totalWeekdayPlaytime > 0
+                                    ? `${((day.seconds / totalWeekdayPlaytime) * 100).toFixed(1)}%`
+                                    : "",
+                                fill: "var(--foreground)",
+                                style: "pointer-events: none; font-family: inherit; font-size: 12px; font-weight: 400; stroke: none;",
+                            }}
                             legend={{ placement: "bottom", classes: { root: "w-full", items: "justify-center gap-x-4 gap-y-2" } }}
                             padding={{ bottom: 80 }}
                             cRange={weekdayPlaytime.map((day) => weekdayConfig[day.key as keyof typeof weekdayConfig].color)}
