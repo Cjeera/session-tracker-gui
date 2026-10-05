@@ -59,9 +59,9 @@
             <Table.Header><Table.Row><Table.Head>PID</Table.Head><Table.Head>Name</Table.Head></Table.Row></Table.Header>
             <Table.Body>
               {#each tracker.searchResults as process}
-                <Table.Row>
+                <Table.Row class="cursor-pointer active:scale-98 transition-all" onclick={() => tracker.trackSession({ pid: process.pid, name: process.name })}>
                   <Table.Cell>{process.pid}</Table.Cell>
-                  <Table.Cell><Button type="button" variant="ghost" class="h-auto justify-start whitespace-normal text-left" onclick={() => tracker.trackSession({ pid: process.pid, name: process.name })}>{process.name}</Button></Table.Cell>
+                  <Table.Cell><Button type="button" variant="ghost" class="h-auto justify-start whitespace-normal text-left">{process.name}</Button></Table.Cell>
                 </Table.Row>
               {/each}
             </Table.Body>

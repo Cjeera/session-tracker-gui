@@ -91,7 +91,7 @@
         </div>
         {/if}
             {#each games as game}
-                <Card.Root class="overflow-hidden border-0 p-0 shadow-lg">
+                <Card.Root class="overflow-hidden border-0 p-0 shadow-lg active:translate-y-2 transition-all">
                 <a href="/library/{game.gameId}/" class="group relative block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={game.title}>
                     <img
                         src={game.coverPath || "/placeholder.avif"}
