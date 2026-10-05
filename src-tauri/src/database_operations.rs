@@ -28,7 +28,7 @@ pub struct SessionRust
 }
 
 /// A struct for storing game IDs, game titles and cover art.
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Game
 {
@@ -39,14 +39,36 @@ pub struct Game
 }
 
 /// A struct for play time info on a specific game.
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct GameStats
+pub struct GameStats 
 {
     game_id: i64,
     total_playtime: i64,
     total_sessions: i64,
     last_played: Option<String>,
+    average_session_length: f64,
+    average_start_time: Option<String>,
+    average_end_time: Option<String>,
+}
+
+/// A struct for game play time info for a specific time range.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameTimeRangeStats
+{
+    game_id: i64,
+    range: String,
+    total_playtime: i64,
+}
+
+/// A struct for global play time info for a specific time range.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlobalTimeRangeStats
+{
+    range: String,
+    total_playtime: i64
 }
 
 /// Opens and returns a sqlite connection.
@@ -70,6 +92,25 @@ fn map_sessions(row: &rusqlite::Row<'_>) -> Result<Session, rusqlite::Error>
         end_ts: row.get(2)?,
         duration_seconds: row.get(3)?,
         notes: row.get(4)?,
+    })
+}
+
+fn map_game_playtime(row: &rusqlite::Row<'_>) -> Result<GameTimeRangeStats, rusqlite::Error> 
+{
+    Ok(GameTimeRangeStats 
+    {
+        game_id: row.get(0)?,
+        range: row.get(1)?,
+        total_playtime: row.get(2)?,
+    })
+}
+
+fn map_global_playtime(row: &rusqlite::Row<'_>) -> Result<GlobalTimeRangeStats, rusqlite::Error> 
+{
+    Ok(GlobalTimeRangeStats 
+    {
+        range: row.get(0)?,
+        total_playtime: row.get(1)?,
     })
 }
 
@@ -136,6 +177,9 @@ fn map_game_stats(row: &rusqlite::Row<'_>) -> Result<GameStats, rusqlite::Error>
         total_playtime: row.get(1)?,
         total_sessions: row.get(2)?,
         last_played: row.get(3)?,
+        average_session_length: row.get(4)?,
+        average_start_time: row.get(5)?,
+        average_end_time: row.get(6)?,
     })
 }
 
@@ -145,13 +189,41 @@ pub fn get_stats(game_id: i64) -> Result<GameStats, AppError>
     let conn = open_connection()?;
 
     let mut query = conn.prepare(
-        "SELECT
-            game_id,
-            COALESCE(SUM(duration_seconds), 0),
-            COUNT(session_id),
-            MAX(start_ts)
-        FROM sessions
-        WHERE game_id = ?1;")?;
+        " WITH totals as (
+                SELECT
+                    ?1 AS game_id,
+                    COALESCE(SUM(duration_seconds), 0) AS total_duration_seconds,
+                    COUNT(session_id) AS session_count,
+                    MAX(start_ts) AS last_start_ts,
+                    COALESCE(AVG(duration_seconds), 0.0) AS avg_duration_seconds,
+                    AVG(SIN(2 * PI() * CAST(strftime('%s', start_ts) AS INTEGER) / 86400.0)) AS start_sin,
+                    AVG(COS(2 * PI() * CAST(strftime('%s', start_ts) AS INTEGER) / 86400.0)) AS start_cos,
+                    AVG(SIN(2 * PI() * CAST(strftime('%s', end_ts) AS INTEGER) / 86400.0)) AS end_sin,
+                    AVG(COS(2 * PI() * CAST(strftime('%s', end_ts) AS INTEGER) / 86400.0)) AS end_cos
+                FROM sessions
+                WHERE game_id = ?1
+        ),
+        means AS (
+            SELECT *,
+                (CAST(ROUND(ATAN2(start_sin, start_cos) * 86400.0 / (2 * PI()))
+                    AS INTEGER) + 86400) % 86400 AS start_seconds,
+                (CAST(ROUND(ATAN2(end_sin, end_cos) * 86400.0 / (2 * PI()))
+                    AS INTEGER) + 86400) % 86400 AS end_seconds
+            FROM totals
+        )
+        SELECT
+            ?1 AS game_id,
+            total_duration_seconds,
+            session_count,
+            last_start_ts,
+            avg_duration_seconds,
+            CASE WHEN start_seconds IS NOT NULL
+                THEN printf('%02d:%02d', start_seconds / 3600, start_seconds % 3600 / 60)
+            END AS avg_start_time,
+            CASE WHEN end_seconds IS NOT NULL
+                THEN printf('%02d:%02d', end_seconds / 3600, end_seconds % 3600 / 60)
+            END AS avg_end_time
+        FROM means;")?;
     
     let mut game_stats = query.query_row([&game_id], map_game_stats)?;
 
@@ -195,6 +267,114 @@ pub fn update_status(game_id: i64, status: &str) -> Result<(), AppError>
         params![&status, &game_id])?;
 
     Ok(())
+}
+
+pub fn get_game_weekly_playtime(game_id: i64) -> Result<Vec<GameTimeRangeStats>, AppError>
+{
+    let conn = open_connection()?;
+
+    let mut query = conn.prepare(
+        "SELECT
+            ?1 AS game_id, 
+            strftime('%Y-%W', start_ts) as week,
+            SUM(duration_seconds) as total_playtime_weekly
+        FROM sessions
+        WHERE game_id = ?1
+        GROUP BY week;"
+    )?;
+
+    let result: Vec<GameTimeRangeStats> = query.query_map([game_id], map_game_playtime)?.collect::<Result<_,_>>()?;
+
+    Ok(result)
+}
+
+pub fn get_game_monthly_playtime(game_id: i64) -> Result<Vec<GameTimeRangeStats>, AppError>
+{
+    let conn = open_connection()?;
+
+    let mut query = conn.prepare(
+        "SELECT
+            ?1 AS game_id, 
+            strftime('%Y-%m', start_ts) as month,
+            SUM(duration_seconds) as total_playtime_monthly
+        FROM sessions
+        WHERE game_id = ?1
+        GROUP BY month;"
+    )?;
+
+    let result: Vec<GameTimeRangeStats> = query.query_map([game_id], map_game_playtime)?.collect::<Result<_,_>>()?;
+
+    Ok(result)
+}
+
+pub fn get_game_yearly_playtime(game_id: i64) -> Result<Vec<GameTimeRangeStats>, AppError>
+{
+    let conn = open_connection()?;
+
+    let mut query = conn.prepare(
+        "SELECT
+            ?1 AS game_id, 
+            strftime('%Y', start_ts) as year,
+            SUM(duration_seconds) as total_playtime_yearly
+        FROM sessions
+        WHERE game_id = ?1
+        GROUP BY year;"
+    )?;
+
+    let result: Vec<GameTimeRangeStats> = query.query_map([game_id], map_game_playtime)?.collect::<Result<_,_>>()?;
+
+    Ok(result)
+}
+
+pub fn get_global_weekly_playtime() -> Result<Vec<GlobalTimeRangeStats>, AppError>
+{
+    let conn = open_connection()?;
+
+    let mut query = conn.prepare(
+        "SELECT 
+            strftime('%Y-%W', start_ts) as week,
+            SUM(duration_seconds) as total_playtime_weekly
+        FROM sessions
+        GROUP BY week;"
+    )?;
+
+    let result: Vec<GlobalTimeRangeStats> = query.query_map([], map_global_playtime)?.collect::<Result<_,_>>()?;
+
+    Ok(result)
+}
+
+pub fn get_global_monthly_playtime() -> Result<Vec<GlobalTimeRangeStats>, AppError>
+{
+    let conn = open_connection()?;
+
+    let mut query = conn.prepare(
+        "SELECT 
+            strftime('%Y-%m', start_ts) as month,
+            SUM(duration_seconds) as total_playtime_monthly
+        FROM sessions
+        GROUP BY month;"
+    )?;
+
+    let result: Vec<GlobalTimeRangeStats> = query.query_map([], map_global_playtime)?.collect::<Result<_,_>>()?;
+
+    Ok(result)
+}
+
+pub fn get_global_yearly_playtime() -> Result<Vec<GlobalTimeRangeStats>, AppError>
+{
+    let conn = open_connection()?;
+
+    let mut query = conn.prepare(
+        "SELECT 
+            strftime('%Y', start_ts) as year,
+            SUM(duration_seconds) as total_playtime_yearly
+        FROM sessions
+        GROUP BY year;"
+    )?;
+
+    let result: Vec<GlobalTimeRangeStats> = query.query_map([], map_global_playtime)?.collect::<Result<_,_>>()?;
+
+    Ok(result)
 }
 
 /// Creates the tables used in the program.
