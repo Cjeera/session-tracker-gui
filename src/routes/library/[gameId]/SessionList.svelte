@@ -139,7 +139,7 @@
                     {#each sessionPage.rows as row (row.sessionId)}
                         <!-- A native button supplies keyboard access; clicking anywhere in the row is a convenience. -->
                         <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
-                        <Table.Row class="cursor-pointer" onclick={() => getSingleSession(row)}>
+                        <Table.Row class="cursor-pointer active:scale-98 transition-all" onclick={() => getSingleSession(row)}>
                             <Table.Cell><Button variant="ghost" size="sm" onclick={() => getSingleSession(row)} aria-label={"View session " + row.displayId}>{row.displayId}</Button></Table.Cell>
                             <Table.Cell>{formatLocaleDate(row.startTs)}</Table.Cell>
                             <Table.Cell>{formatLocaleDate(row.endTs)}</Table.Cell>
