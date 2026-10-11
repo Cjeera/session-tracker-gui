@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { BarChart, PieChart } from "layerchart/svg";
+    import { BarChart, PieChart } from "layerchart";
     import * as Chart from "#lib/components/ui/chart/index.js";
     import * as Card from "#lib/components/ui/card/index.js";
     import { formatDuration } from "#lib/timeFormatting.js";

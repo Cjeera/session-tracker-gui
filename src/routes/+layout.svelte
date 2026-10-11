@@ -84,6 +84,7 @@
         {/if}
         <div class="flex gap-2">
             <Button href="/" variant={activeUrl === "/" ? "secondary" : "ghost"} aria-current={activeUrl === "/" ? "page" : undefined}>Session Tracker</Button>
+            <Button href="/stats" variant={activeUrl.startsWith("/stats") ? "secondary" : "ghost"} aria-current={activeUrl.startsWith("/stats") ? "page" : undefined}>Stats</Button>
             <Button href="/library" variant={activeUrl.startsWith("/library") ? "secondary" : "ghost"} aria-current={activeUrl.startsWith("/library") ? "page" : undefined}>Library</Button>
         </div>
     </nav>
