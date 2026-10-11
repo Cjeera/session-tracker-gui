@@ -21,15 +21,13 @@
     // The game id passed from the library page.
     let params = $derived(page.params as unknown as RouteParams);
     let rawId = $derived(params.gameId);
+    let numericId = $derived(Number(rawId));
 
     let modalState = $state(false);
     
     // Data stores for the fetched backend information
     let game = $state<Partial<Game>>({});
     let gameStats = $state<Partial<GameStats>>({});
-    let gameWeeklyStats = $state<Partial<GameTimeRangeStats[]>>([]);
-    let gameMonthlyStats = $state<Partial<GameTimeRangeStats[]>>([]);
-    let gameYearlyStats = $state<Partial<GameTimeRangeStats[]>>([]);
     let sessions = $state<Session[]>([]);
     let covers = $state<GameCover[]>([]);
 
@@ -45,8 +43,6 @@
         sessions = [];
         
         try {
-            // Convert the URL string ID into a number for Rust's u32/i32 expectation
-            let numericId = Number(rawId);
             
             // Await the response from the Rust backend
             sessions = await invoke("get_game_sessions", { gameId: numericId });
@@ -59,8 +55,6 @@
      */
     async function getGame() {
         try {
-            // Convert the URL string ID into a number
-            let numericId = Number(rawId);
             
             // Await the game data from the Rust backend
             game = await invoke("get_single_game", { gameId: numericId });
@@ -77,9 +71,6 @@
         // Reset state before fetching
         errorMsg = "";
         gameStats = {};
-        gameWeeklyStats = [];
-        gameMonthlyStats = [];
-        gameYearlyStats = [];
 
         try {
             // Convert the URL string ID into a number
@@ -87,10 +78,6 @@
             
             // Await the stats payload from the Rust backend
             gameStats = await invoke("get_game_stats", { gameId: numericId });      
-            gameWeeklyStats = await invoke("get_game_weekly_stats", { gameId: numericId });
-            gameMonthlyStats = await invoke("get_game_monthly_stats", { gameId: numericId });
-            gameYearlyStats = await invoke("get_game_yearly_stats", { gameId: numericId });
-            
         } catch (error) {
             errorMsg = String(error);
             console.error("Failed to load stats:", error);
@@ -216,7 +203,7 @@
                 </Tabs.List>
                 <Tabs.Content value="sessions"><SessionList bind:sessions /></Tabs.Content>
                 <Tabs.Content value="timeline"><SessionTimeline {sessions} /></Tabs.Content>
-                <Tabs.Content value="stats"><Stats {sessions} /></Tabs.Content>
+                <Tabs.Content value="stats"><Stats sessions={sessions} gameId={numericId} /></Tabs.Content>
             </Tabs.Root>
         </div>
     </div>

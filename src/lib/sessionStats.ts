@@ -1,4 +1,6 @@
-import type { Session } from "./types.js";
+import { invoke } from "@tauri-apps/api/core";
+import type { Session, GameTimeRangeStats, GlobalTimeRangeStats } from "./types.js";
+import { formatDuration } from "./timeFormatting.js";
 
 /** Aggregate sessions by local calendar day, returning the seven most recent active days. */
 export function getRecentActivity(sessions: Session[]) {
@@ -34,4 +36,35 @@ export function getWeekdayPlaytime(sessions: Session[]) {
         data[new Date(session.startTs).getDay()].seconds += session.durationSeconds;
     }
     return data;
+}
+
+export async function getGameTimeRangeStats(gameId: number) {
+    try {
+        const [weeklyPlaytime, monthlyPlaytime, yearlyPlaytime] = await Promise.all([
+            invoke<GameTimeRangeStats[]>("get_game_weekly_stats", { gameId: gameId }),
+            invoke<GameTimeRangeStats[]>("get_game_monthly_stats", { gameId: gameId }),
+            invoke<GameTimeRangeStats[]>("get_game_yearly_stats", { gameId: gameId }),
+        ]);
+        
+
+    const weeklyPlaytimeStats = weeklyPlaytime.map((entry) => ({
+        range: entry.range,
+        playtime: Number((entry.totalPlaytime / 3600).toFixed(2))
+    }));
+
+    const monthlyPlaytimeStats = monthlyPlaytime.map((entry) => ({
+        range: entry.range,
+        playtime: Number((entry.totalPlaytime / 3600).toFixed(2))
+    }));
+
+    const yearlyPlaytimeStats = yearlyPlaytime.map((entry) => ({
+        range: entry.range,
+        playtime: Number((entry.totalPlaytime / 3600).toFixed(2))
+    }));
+
+    return { weeklyPlaytimeStats, monthlyPlaytimeStats, yearlyPlaytimeStats }
+
+    } catch (err) {
+        console.error(err);
+    }
 }

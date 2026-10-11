@@ -1,20 +1,26 @@
 <script lang="ts">
-    import { BarChart, PieChart } from "layerchart";
+    import TrendingUpIcon from "@lucide/svelte/icons/trending-up";
+    import { BarChart, PieChart, AreaChart } from "layerchart";
     import * as Chart from "#lib/components/ui/chart/index.js";
     import * as Card from "#lib/components/ui/card/index.js";
+    import { curveLinear } from "d3-shape";
     import { formatDuration } from "#lib/timeFormatting.js";
-    import { getRecentActivity, getLongestSessions, getWeekdayPlaytime } from "#lib/sessionStats.ts";
+    import { getRecentActivity, getLongestSessions, getWeekdayPlaytime, getGameTimeRangeStats } from "#lib/sessionStats.ts";
     import type { Session } from "#lib/types.js";
     import { fade } from "svelte/transition";
 
-    let { sessions }: { sessions: Session[] } = $props();
+    let { sessions, gameId }: { sessions: Session[], gameId: number } = $props();
+
+    let gameTimeRangeStats = $derived(await getGameTimeRangeStats(gameId))
 
     const recentConfig = {
         sessions: { label: "Sessions", color: "var(--chart-1)" },
     } satisfies Chart.ChartConfig;
+
     const longestConfig = {
         durationSeconds: { label: "Playtime", color: "var(--chart-2)" },
     } satisfies Chart.ChartConfig;
+
     const weekdayConfig = {
         sunday: { label: "Sunday", color: "var(--chart-1)" },
         monday: { label: "Monday", color: "var(--chart-2)" },
@@ -24,6 +30,19 @@
         friday: { label: "Friday", color: "var(--chart-6)" },
         saturday: { label: "Saturday", color: "var(--chart-7)" },
     } satisfies Chart.ChartConfig;
+
+    const weekRangeConfig = {
+        playtime: { label: "Playtime", color: "var(--chart-1)"},
+    } satisfies Chart.ChartConfig;
+
+    const monthRangeConfig = {
+        playtime: { label: "Playtime", color: "var(--chart-1)"},
+    } satisfies Chart.ChartConfig;
+
+    const yearRangeConfig = {
+        playtime: { label: "Playtime", color: "var(--chart-1)"},
+    } satisfies Chart.ChartConfig;
+
 
     let recentSessions = $derived(getRecentActivity(sessions));
     let longestSessions = $derived(getLongestSessions(sessions));
@@ -35,6 +54,11 @@
 {#snippet durationValue({ value, name }: { value: unknown; name: string })}
     <span class="text-muted-foreground">{name}</span>
     <span class="ml-auto font-mono font-medium tabular-nums">{formatDuration(Math.round(Number(value)))}</span>
+{/snippet}
+
+{#snippet rangeValue({ value, name }: { value: unknown; name: string })}
+    <span class="text-muted-foreground">{name}</span>
+    <span class="ml-auto font-mono font-medium tabular-nums">{`${value} hours`}</span>
 {/snippet}
 
 <div class="space-y-6" in:fade={{ duration: 75 }}>
@@ -140,6 +164,121 @@
                 <ul class="sr-only" aria-label="Weekday playtime">
                     {#each weekdayPlaytime as day}<li>{day.label}: {formatDuration(day.seconds)}</li>{/each}
                 </ul>
+            </Card.Content>
+        </Card.Root>
+
+        <Card.Root>
+            <Card.Header>
+                <Card.Title>Playtime hours by week</Card.Title>
+            </Card.Header>
+            <Card.Content>
+                <Chart.Container config={weekRangeConfig}>
+                    <AreaChart
+                        data={gameTimeRangeStats?.weeklyPlaytimeStats}
+                        x="range"
+                        series={[
+                            {
+                                key: "playtime",
+                                label: "Playtime",
+                                color: weekRangeConfig.playtime.color,
+                            }
+                        ]}
+                        props={{
+                            area: {
+                                curve: curveLinear,
+                                fillOpacity: 0.4,
+                                line: { class: "stroke-1" },
+                                motion: "tween"
+                            },
+                            xAxis: {
+                                tickOcclusion: { padding: 10, priority: "start-end"}
+                            }
+                        }}     
+                    >
+                        {#snippet tooltip()}
+                            <Chart.Tooltip
+                                formatter={rangeValue}
+                             />
+                        {/snippet}
+                    </AreaChart>
+                </Chart.Container>
+            </Card.Content>
+        </Card.Root>
+
+        <Card.Root>
+            <Card.Header>
+                <Card.Title>Playtime hours by month</Card.Title>
+            </Card.Header>
+            <Card.Content>
+                <Chart.Container config={monthRangeConfig}>
+                    <AreaChart
+                        data={gameTimeRangeStats?.monthlyPlaytimeStats}
+                        x="range"
+                        series={[
+                            {
+                                key: "playtime",
+                                label: "Playtime",
+                                color: monthRangeConfig.playtime.color,
+                            }
+                        ]}
+                        props={{
+                            area: {
+                                curve: curveLinear,
+                                fillOpacity: 0.4,
+                                line: { class: "stroke-1" },
+                                motion: "tween"
+                            },
+                        }}
+                    >
+                        {#snippet tooltip({ context })}
+                            <Chart.Tooltip
+                                label={context.tooltip.data?.range
+                                    ? new Date(`${context.tooltip.data.range}-01T00:00:00`)
+                                        .toLocaleDateString("en-GB", {
+                                            month: "long",
+                                            year: "numeric"
+                                        })
+                                    : undefined}
+                                formatter={rangeValue}
+                            />
+                        {/snippet}
+                    </AreaChart>
+                </Chart.Container>
+            </Card.Content>
+        </Card.Root>
+
+        <Card.Root>
+            <Card.Header>
+                <Card.Title>Playtime hours by year</Card.Title>
+            </Card.Header>
+            <Card.Content>
+                <Chart.Container config={yearRangeConfig}>
+                    <AreaChart
+                        data={gameTimeRangeStats?.yearlyPlaytimeStats}
+                        x="range"
+                        series={[
+                            {
+                                key: "playtime",
+                                label: "Playtime",
+                                color: yearRangeConfig.playtime.color,
+                            }
+                        ]}
+                        props={{
+                            area: {
+                                curve: curveLinear,
+                                fillOpacity: 0.4,
+                                line: { class: "stroke-1" },
+                                motion: "tween"
+                            },
+                        }}
+                    >
+                        {#snippet tooltip()}
+                            <Chart.Tooltip
+                                formatter={rangeValue}
+                             />
+                        {/snippet}
+                    </AreaChart>
+                </Chart.Container>
             </Card.Content>
         </Card.Root>
     {/if}
