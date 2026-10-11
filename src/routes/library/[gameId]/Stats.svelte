@@ -3,7 +3,7 @@
     import * as Chart from "#lib/components/ui/chart/index.js";
     import * as Card from "#lib/components/ui/card/index.js";
     import { formatDuration } from "#lib/timeFormatting.js";
-    import { getRecentActivity, getLongestSessions, getWeekdayPlaytime } from "#lib/sessionStats";
+    import { getRecentActivity, getLongestSessions, getWeekdayPlaytime } from "#lib/sessionStats.ts";
     import type { Session } from "#lib/types.js";
     import { fade } from "svelte/transition";
 
