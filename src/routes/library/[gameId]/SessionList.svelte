@@ -16,12 +16,8 @@
     } from "#lib/timeFormatting.js";
 
     import type { Session } from "#lib/types.js";
-
-
-
+    
     import { invoke } from "@tauri-apps/api/core";
-
-
 
     // Sessions prop from gameInfo page.
     let { sessions = $bindable() }: { sessions: Session[] } = $props();
