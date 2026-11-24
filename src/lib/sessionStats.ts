@@ -1,6 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Session, GameTimeRangeStats, GlobalTimeRangeStats } from "./types.js";
-import { formatDuration } from "./timeFormatting.js";
+import type { Session, GameTimeRangeStats } from "./types.js";
 
 /** Aggregate sessions by local calendar day, returning the seven most recent active days. */
 export function getRecentActivity(sessions: Session[]) {
@@ -66,5 +65,36 @@ export async function getGameTimeRangeStats(gameId: number) {
 
     } catch (err) {
         console.error(err);
+    }
+}
+
+export function getPlaytimeDateString(firstTimestamp: string, lastTimestamp: string) {
+    try {
+        let firstDate = Temporal.Instant.from(firstTimestamp).toZonedDateTimeISO("UTC").toPlainDate();
+        let secondDate = Temporal.Instant.from(lastTimestamp).toZonedDateTimeISO("UTC").toPlainDate();
+
+        const diff = firstDate.until(secondDate, {
+            largestUnit: "years"
+        });
+
+        const years = diff.years;
+        const months = diff.months;
+        const weeks = Math.trunc(diff.days / 7);
+        const days = diff.days % 7; 
+
+        if (years > 0) {
+            return `${years} Years, ${months} Months, ${weeks} Weeks, ${days} Days`;
+        } else if (months > 0) {
+            return `${months} Months, ${weeks} Weeks, ${days} Days`;
+        } else if (weeks > 0) {
+            return `${weeks} Weeks, ${days} Days`;
+        } else if (days > 0) {
+            return `${days} Days`;
+        } else {
+            return "";
+        }
+
+    } catch (error) {
+        console.error(error);
     }
 }

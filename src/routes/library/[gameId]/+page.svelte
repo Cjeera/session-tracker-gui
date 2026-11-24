@@ -13,6 +13,7 @@
     import Stats from "./Stats.svelte";
     import { formatDuration, formatLocaleDate, formatTime } from "#lib/timeFormatting.js";
     import type { GameCover, Game, GameStats, Session, GameTimeRangeStats } from "#lib/types.js";
+    import { getPlaytimeDateString } from "#lib/sessionStats.ts";
 
     interface RouteParams {
         gameId: string;
@@ -31,6 +32,8 @@
     let sessions = $state<Session[]>([]);
     let covers = $state<GameCover[]>([]);
 
+    let timeTaken = $state<string | undefined>("");
+
     // UI state trackers
     let errorMsg = $state("");
     let radioGroup = $state("");
@@ -43,9 +46,9 @@
         sessions = [];
         
         try {
-            
             // Await the response from the Rust backend
             sessions = await invoke("get_game_sessions", { gameId: numericId });
+            timeTaken = getPlaytimeDateString(sessions[0].startTs, sessions[sessions.length - 1].startTs);
         } catch (error) {
             console.error("Failed to load sessions:", error);
         }
@@ -176,6 +179,7 @@
 
             <div class="mt-4 flex flex-col items-center text-xl gap-2 font-semibold">
                 <p>Total Hours Played: {gameStats.totalPlaytime ? formatDuration(gameStats.totalPlaytime) : "00:00:00"}</p>
+                <p>Time Taken: {timeTaken}</p>
                 <p>Average Session Length: {gameStats.averageSessionLength ? formatDuration(gameStats.averageSessionLength) : "00:00:00"}</p>
                 <p>Total Sessions: {gameStats.totalSessions || 0}</p>
                 <p>Average Start Time: {gameStats.averageStartTime ?? "Not Played"}</p>
