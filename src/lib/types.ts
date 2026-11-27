@@ -12,6 +12,7 @@ export interface SessionRust {
         endTs: string;
         durationSeconds: number
         notes: string;
+        processName: string;
     }
 
 export interface Game {
