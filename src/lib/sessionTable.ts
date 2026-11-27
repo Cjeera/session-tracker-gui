@@ -1,4 +1,4 @@
-import type { Session } from "./types.js";
+import type { Session } from "./types.svelte.js";
 
 export type SessionColumn = "displayId" | "startDate" | "endDate" | "startTime" | "endTime" | "durationSeconds";
 export type SessionRow = Session & { displayId: number };
