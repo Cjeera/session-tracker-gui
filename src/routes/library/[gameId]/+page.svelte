@@ -11,6 +11,7 @@
     import SessionList from "./SessionList.svelte";
     import SessionTimeline from "./SessionTimeline.svelte";
     import Stats from "./Stats.svelte";
+    import Settings from "./Settings.svelte";
     import { formatDuration, formatLocaleDate, formatTime } from "#lib/timeFormatting.js";
     import type { GameCover, Game, GameStats, Session, GameTimeRangeStats } from "#lib/types.js";
     import { getPlaytimeDateString } from "#lib/sessionStats.ts";
@@ -177,7 +178,7 @@
                 {game.title}
             </h1>
 
-            <div class="mt-4 flex flex-col items-center text-xl gap-2 font-semibold">
+            <div class="mt-4 flex flex-col items-center text-xl gap-2 font-semibold justify-items-center">
                 <p>Total Hours Played: {gameStats.totalPlaytime ? formatDuration(gameStats.totalPlaytime) : "00:00:00"}</p>
                 <p>Time Taken: {timeTaken}</p>
                 <p>Average Session Length: {gameStats.averageSessionLength ? formatDuration(gameStats.averageSessionLength) : "00:00:00"}</p>
@@ -186,7 +187,7 @@
                 <p>Average End Time: {gameStats.averageEndTime ?? "Not Played"}</p>
                 <p>Last Played: {gameStats.lastPlayed ? formatLocaleDate(gameStats.lastPlayed) : "Not Played"}</p>
 
-                <RadioGroup.Root value={radioGroup} onValueChange={(value) => { radioGroup = value; updateStatus(value); }} class="flex flex-wrap gap-4" aria-label="Game status">
+                <RadioGroup.Root value={radioGroup} onValueChange={(value) => { radioGroup = value; updateStatus(value); }} class="flex flex-wrap gap-4 justify-center" aria-label="Game status">
                     {#each ["played", "playing", "backlog"] as status}
                         <div class="flex items-center gap-2">
                             <RadioGroup.Item id={"status-" + status} value={status} class="cursor-pointer" />
@@ -204,10 +205,12 @@
                     <Tabs.Trigger value="sessions">Sessions</Tabs.Trigger>
                     <Tabs.Trigger value="timeline">Timeline</Tabs.Trigger>
                     <Tabs.Trigger value="stats">Stats</Tabs.Trigger>
+                    <Tabs.Trigger value="settings">Settings</Tabs.Trigger>
                 </Tabs.List>
                 <Tabs.Content value="sessions"><SessionList bind:sessions /></Tabs.Content>
                 <Tabs.Content value="timeline"><SessionTimeline {sessions} /></Tabs.Content>
                 <Tabs.Content value="stats"><Stats sessions={sessions} gameId={numericId} /></Tabs.Content>
+                <Tabs.Content value="settings"><Settings gameId={numericId}></Settings></Tabs.Content>
             </Tabs.Root>
         </div>
     </div>
