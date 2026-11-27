@@ -4,10 +4,10 @@ pub mod database_operations;
 pub mod api_requests;
 
 use crate::api_requests::{get_cover_art, GameCover};
-use crate::session_tracker::{track_session, end_session, process_search, Process};
-use crate::database_operations::{get_games, get_stats, get_sessions, get_game_by_id, edit_session_notes, insert_cover_art, update_status, get_game_weekly_playtime, get_game_monthly_playtime, get_game_yearly_playtime, get_global_weekly_playtime, get_global_monthly_playtime, get_global_yearly_playtime, Session, SessionRust, Game, GameStats, GameTimeRangeStats, GlobalTimeRangeStats};
+use crate::session_tracker::{track_session, end_session, process_search, Process, auto_search};
+use crate::database_operations::{get_games, get_stats, get_sessions, get_game_by_id, edit_session_notes, insert_cover_art, update_status, get_game_weekly_playtime, get_game_monthly_playtime, get_game_yearly_playtime, get_global_weekly_playtime, get_global_monthly_playtime, get_global_yearly_playtime, get_process_names, insert_process, Session, SessionRust, Game, GameStats, GameTimeRangeStats, GlobalTimeRangeStats};
 use crate::error::AppError;
-use tauri::{AppHandle, Builder, Manager};
+use tauri::{AppHandle, Builder, Manager, tray::{TrayIconBuilder}, menu::{Menu, MenuItem}};
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 
 pub struct SessionState 
@@ -218,8 +218,22 @@ async fn insert_selected_cover(cover: GameCover, game_id: i64, is_auto_fetch: bo
     Ok(())
 }
 
+#[tauri::command]
+fn insert_process_name(game_id: i64, process_name: &str) -> Result<(), AppError>
+{
+    insert_process(game_id, process_name)?;
+
+    Ok(())
+}
+
+#[tauri::command]
+fn get_processes(game_id: Option<i64>) -> Result<Vec<String>, AppError> 
+{ 
+    Ok(get_process_names(game_id)?)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
-pub fn run() {
+pub fn run() -> Result<(), AppError> {
     let mut builder = Builder::default();
 
     #[cfg(desktop)]
@@ -228,6 +242,7 @@ pub fn run() {
     }
 
     builder
+        .plugin(tauri_plugin_autostart::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
@@ -251,17 +266,40 @@ pub fn run() {
             edit_notes,
             fetch_cover_art,
             insert_selected_cover,
-            update_game_status
+            update_game_status,
+            insert_process_name,
+            get_processes,
         ])
         .setup(|app| 
         {
+            use tauri_plugin_autostart::ManagerExt;
+
+            let autostart_manager = app.autolaunch();
+            let _ = autostart_manager.enable();
+
+            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+            let open_i = MenuItem::with_id(app, "open", "Open Session Tracker", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&quit_i, &open_i])?;
+               
+            let tray = TrayIconBuilder::new()
+                .menu(&menu)
+                .show_menu_on_left_click(true)
+                .icon(app.default_window_icon().unwrap().clone())
+                .build(app)?;
+            
             app.manage(SessionState 
             {
                 paused: Arc::new(AtomicBool::new(false)),
                 ended: Arc::new(AtomicBool::new(false)),
             });
+
+            auto_search()?;
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+
+    
+    
+    Ok(())
 }
