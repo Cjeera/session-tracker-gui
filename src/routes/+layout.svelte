@@ -4,6 +4,7 @@
     import "../app.css";
     import { Button } from "#lib/components/ui/button/index.ts";
     import { Toaster } from "#lib/components/ui/sonner/index.js";
+    import { toast } from 'svelte-sonner';
     
     // Import the Tauri plugins
     import { check } from '@tauri-apps/plugin-updater';
@@ -11,6 +12,23 @@
     import { relaunch } from '@tauri-apps/plugin-process';
     import { tracker } from "./sessionTracker.svelte.ts";
     import { getCurrentWindow } from "@tauri-apps/api/window";
+    import { emit } from "@tauri-apps/api/event";
+    import { Switch } from "#lib/components/ui/switch/index.ts";
+    import { Label } from "#lib/components/ui/label/index.js";
+    import { autoSearch } from '#lib/types.svelte.ts';
+
+    async function autoSearchTrigger() {
+        try {
+            if (autoSearch.autosearchOn) {
+                await emit("stop-auto-search");
+            } else {
+                await emit("start-auto-search");
+            }
+        } catch(error) {
+            console.log(String(error))
+            toast.error(String(error));
+        }
+    }
 
     let { children } = $props();
     let activeUrl = $derived(page.url.pathname);
@@ -84,7 +102,9 @@
         {#if tracker.stopwatchDisplay.length > 0 && activeUrl.includes("/library")}
             <span class="font-mono text-xl tabular-nums" role="timer">{tracker.stopwatchDisplay}</span>
         {/if}
-        <div class="flex gap-2">
+        <div class="flex gap-2 items-center">
+        	<Label class="cursor-pointer" for="auto-search">Auto Search</Label>
+            <Switch class="cursor-pointer" id="auto-search" bind:checked={autoSearch.autosearchOn} onclick={async () => await autoSearchTrigger()}/>
             <Button href="/" variant={activeUrl === "/" ? "secondary" : "ghost"} aria-current={activeUrl === "/" ? "page" : undefined}>Session Tracker</Button>
             <Button href="/stats" variant={activeUrl.startsWith("/stats") ? "secondary" : "ghost"} aria-current={activeUrl.startsWith("/stats") ? "page" : undefined}>Stats</Button>
             <Button href="/library" variant={activeUrl.startsWith("/library") ? "secondary" : "ghost"} aria-current={activeUrl.startsWith("/library") ? "page" : undefined}>Library</Button>
