@@ -25,6 +25,7 @@ pub struct SessionRust
     pub end_ts: DateTime<Utc>,
     pub duration_seconds: i64,
     pub notes: Option<String>,
+    pub process_name: String,
 }
 
 /// A struct for storing game IDs, game titles and cover art.
@@ -145,6 +146,47 @@ fn map_games(row: &rusqlite::Row<'_>) -> Result<Game, rusqlite::Error>
         cover_path: row.get(2)?,
         status: row.get(3)?,
     })
+}
+
+pub fn get_process_names(game_id: Option<i64>) -> Result<Vec<String>, AppError>
+{
+    let conn = open_connection()?;
+
+
+    if game_id.is_some()
+    {
+        let query_string = "
+            SELECT
+                process_name
+            FROM games
+                WHERE process_name IS NOT NULL AND game_id = ?1;
+        ";
+        let mut query = conn.prepare(query_string)?;
+
+        let process_names: Vec<String> = query.query_map([game_id.unwrap()], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<String>, rusqlite::Error>>()?;
+
+        return Ok(process_names)
+    }
+    else if game_id.is_none()
+    {
+        let query_string = "
+            SELECT
+                process_name
+            FROM games
+                WHERE process_name IS NOT NULL;
+        ";
+        let mut query = conn.prepare(query_string)?;
+
+        let process_names: Vec<String> = query.query_map([], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<String>, rusqlite::Error>>()?;
+
+        return Ok(process_names)
+    } 
+    else
+    {
+        return Err(AppError::Message("huh?".to_string()))
+    };
 }
 
 /// Gets all games in the database and the path to it's cover art.
@@ -385,7 +427,8 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError>
         CREATE TABLE IF NOT EXISTS games (
             game_id INTEGER PRIMARY KEY,
             title TEXT UNIQUE NOT NULL,
-            status TEXT
+            status TEXT,
+            process_name TEXT
         );
 
         CREATE TABLE IF NOT EXISTS sessions (
@@ -402,73 +445,82 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError>
             game_id INTEGER PRIMARY KEY,
             path TEXT UNIQUE,
             FOREIGN KEY (game_id) REFERENCES games(game_id) ON DELETE CASCADE
-        );"
+        );
+        "
     )?;
 
     Ok(())
 }
 
-/// Inserts session into database.
 pub fn insert_data(conn: &Connection, session_data: SessionRust) -> Result<(), AppError>
 {
-    // Returns early if title is empty or duration is negative.
     if session_data.game.trim().is_empty()
     {
-        return Err(AppError::Message("title cannot be empty!".to_string()))
+        return Err(AppError::Message(
+            "Title cannot be empty!".to_string()
+        ));
     }
 
     if session_data.duration_seconds.is_negative()
     {
-        return Err(AppError::Message("Duration cannot be negative!".to_string()))
+        return Err(AppError::Message(
+            "Duration cannot be negative!".to_string()
+        ));
     }
 
     create_tables(conn)?;
 
-    // Converts the timestamps to an RFC3339 formatted string.
     let start_str = session_data.start_ts.to_rfc3339();
     let end_str = session_data.end_ts.to_rfc3339();
 
-    let db_result = || -> Result<(), AppError>
-    {
-        // Inserts game title into db. Doesn't insert if value already exists.
-        conn.execute(
-            "INSERT OR IGNORE INTO games (title)
-                VALUES (?1)",
-        (
+    let tx = conn.unchecked_transaction()?;
+
+    // Inserts the game if it doesn't exist.
+    // Populates the process name if one hasn't been assigned.
+    tx.execute(
+        "INSERT INTO games (title, process_name)
+         VALUES (?1, NULLIF(?2, ''))
+         ON CONFLICT(title) DO UPDATE
+         SET process_name = excluded.process_name
+         WHERE games.process_name IS NULL
+            OR games.process_name = '';",
+        params![
             &session_data.game,
-        ))?;
+            &session_data.process_name
+        ]
+    )?;
 
-        // Gets the id of the game via it's title.
-        let game_id: i64 = conn.query_row(
-            "SELECT game_id
-                FROM games
-            WHERE title = ?1;", 
-        [&session_data.game], |row| row.get(0))?;
+    // Gets the game ID after inserting the game.
+    let game_id: i64 = tx.query_row(
+        "SELECT game_id
+         FROM games
+         WHERE title = ?1;",
+        [&session_data.game],
+        |row| row.get(0)
+    )?;
 
-        // Inserts the session data into the db, using the game_id from the previous query,
-        conn.execute(
-            "INSERT INTO sessions (game_id, start_ts, end_ts, duration_seconds, notes)
-                VALUES (?1, ?2, ?3, ?4, ?5)",
-        (
-            &game_id,
-            &start_str,
-            &end_str,
-            &session_data.duration_seconds,
-            &session_data.notes,
-        ))?;
+    // Inserts the session.
+    tx.execute(
+        "INSERT INTO sessions (
+            game_id,
+            start_ts,
+            end_ts,
+            duration_seconds,
+            notes
+         )
+         VALUES (?1, ?2, ?3, ?4, ?5);",
+        params![
+            game_id,
+            start_str,
+            end_str,
+            session_data.duration_seconds,
+            session_data.notes
+        ]
+    )?;
 
-        Ok(())
+    tx.commit()?;
 
-    }();
-
-    match db_result
-    {
-        Ok(_) => return Ok(()),
-        Err(error) =>
-        {
-            return Err(error)
-        }
-    }
+    Ok(())
 }
 
 pub fn edit_session_notes(session_id: i64, updated_notes: &str) -> Result<(), AppError>
@@ -513,6 +565,25 @@ pub fn insert_cover_art(game_id: i64, cover_url: &str, is_auto_fetch: bool) -> R
     Ok(())
 }
 
+pub fn insert_process(game_id: i64, process_name: &str) -> Result<(), AppError>
+{
+    let conn = open_connection()?;
+
+    let affected = conn.execute(
+        "UPDATE games
+         SET process_name = ?1
+         WHERE game_id = ?2;",
+        params![process_name, game_id]
+    )?;
+
+    if affected == 0
+    {
+        return Err(AppError::Message("Game not found".to_string()));
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests
 {
@@ -531,6 +602,7 @@ mod tests
             end_ts: Utc.with_ymd_and_hms(2023, 10, 1, 16, 0, 0).unwrap(),
             duration_seconds: 7200,
             notes: Some(String::from("Completed main questline")),
+            process_name: String::from("")
         };
 
         // Struct with populated session notes.
@@ -541,6 +613,7 @@ mod tests
             end_ts: Utc.with_ymd_and_hms(2023, 10, 2, 9, 30, 0).unwrap(),
             duration_seconds: 1800,
             notes: None,
+            process_name: String::from("")
         };
         
         // Both session data structs are inserted to database.
@@ -565,6 +638,7 @@ mod tests
             end_ts: Utc::now(),
             duration_seconds: 0,
             notes: None,
+            process_name: String::from("")
         };
 
         // Struct data is inserted into database, error expected.
@@ -586,6 +660,7 @@ mod tests
             end_ts: Utc.with_ymd_and_hms(2023, 10, 5, 10, 0, 0).unwrap(), 
             duration_seconds: -7200, 
             notes: Some(String::from("Time is moving backwards")),
+            process_name: String::from("")
         };
 
         let result_one = insert_data(&conn, bad_session_negative_time);
@@ -605,6 +680,7 @@ mod tests
             end_ts: Utc.with_ymd_and_hms(2023, 10, 6, 8, 0, 0).unwrap(),
             duration_seconds: 0,
             notes: None,
+            process_name: String::from("")
         };
 
         let result_one = insert_data(&conn, edge_case_zero_duration);
@@ -624,6 +700,7 @@ mod tests
             end_ts: Utc.with_ymd_and_hms(2023, 10, 7, 20, 0, 0).unwrap(),
             duration_seconds: 7200,
             notes: Some("A".repeat(10_000)),
+            process_name: String::from("")
         };
 
         let result_one = insert_data(&conn, edge_case_huge_string);
