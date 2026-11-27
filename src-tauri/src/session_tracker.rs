@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use crate::database_operations::{insert_data, open_connection, SessionRust};
+use crate::database_operations::{insert_data, open_connection, SessionRust, get_process_names};
 use chrono::{Utc};
 use serde::Serialize;
 use std::{thread, time};
@@ -11,6 +11,7 @@ use libsw::{Sw, StopwatchImpl};
 use std::time::Instant;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
+use std::ffi::OsStr;
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -41,7 +42,7 @@ fn normalize(string: &str) -> String
 pub fn process_search(game_input: &str) -> Result<Vec<Process>, AppError> 
 {
     // Gets a list of all running processes.
-    let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()));
+    let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()))?;
 
     // Refreshes the process list.
     system.refresh_processes(ProcessesToUpdate::All, true);
@@ -81,18 +82,15 @@ pub fn process_search(game_input: &str) -> Result<Vec<Process>, AppError>
     // Loops through matches struct.
     for entry in matches
     {
-        // The extension is removed from the process name.
-        let name_norm = normalize(&entry.1.name);
-
-        // Process ID from matches vector and normalised name are pushed into search_results.
-        search_results.push(Process { pid: entry.1.pid, name: name_norm} );
+        // Process ID from matches vector and name are pushed into search_results.
+        search_results.push(Process { pid: entry.1.pid, name: entry.1.name} );
     }
 
     Ok(search_results)
 }
 
 /// Checks if a specific process is still running.
-fn process_exists(system: &mut System, pid: Pid) -> bool 
+pub fn process_exists(system: &mut System, pid: Pid) -> bool 
 {
     system.refresh_processes(ProcessesToUpdate::Some(&[pid]), true);
     system.process(pid).is_some()
@@ -133,7 +131,7 @@ fn stopwatch_stop(app: &AppHandle, stopwatch: &mut StopwatchImpl<Instant>) -> Re
 pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<AtomicBool>, ended: Arc<AtomicBool>) -> Result<(), AppError>
 {
     // Gets a list of all running processes.
-    let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()));
+    let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()))?;
 
     // Returns early if process doesn't exist
     if !process_exists(&mut system, Pid::from_u32(pid))
@@ -199,11 +197,12 @@ pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<At
         // The data is gathered into the session_data struct.
         let session_data = SessionRust
         {
-            game: game_input.to_string(),
+            game: game_input.clone(),
             start_ts: start,
             end_ts: end,
             duration_seconds: duration_seconds,
             notes: None,
+            process_name: game_input,
         };
 
         app.emit("session-ended", session_data).unwrap();
@@ -232,6 +231,36 @@ pub fn end_session(session_notes: &str, mut session_data: SessionRust) -> Result
     // The struct data is inserted into the database.
     insert_data(&conn, session_data)?;
 
+    if let Err(error) = auto_search()
+    {
+        eprintln!("Failed to restart auto search: {:?}", error);
+    }
+
+    Ok(())
+}
+
+pub fn auto_search() -> Result<(), AppError>
+{
+    let process_names = get_process_names(None)?;
+    let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()))?;
+
+    thread::spawn(move || {
+        let sleep_time = time::Duration::from_secs(1);
+        'main: loop 
+        {
+            system.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
+            for process in &process_names
+            {
+                if system.processes_by_exact_name(OsStr::new(&process)).find(|n| n.exists()).is_some() 
+                {
+                    break 'main;
+                }
+            }
+            
+            thread::sleep(sleep_time);
+        }
+    });
+    
     Ok(())
 }
 
