@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    session_tracker_gui_lib::run()
+    session_tracker_gui_lib::run().expect("Error running application")
 }
