@@ -7,6 +7,7 @@ use crate::api_requests::{get_cover_art, GameCover};
 use crate::session_tracker::{track_session, end_session, process_search, Process, auto_search};
 use crate::database_operations::{get_games, get_stats, get_sessions, get_game_by_id, edit_session_notes, insert_cover_art, update_status, get_game_weekly_playtime, get_game_monthly_playtime, get_game_yearly_playtime, get_global_weekly_playtime, get_global_monthly_playtime, get_global_yearly_playtime, get_process_names, insert_process, Session, SessionRust, Game, GameStats, GameTimeRangeStats, GlobalTimeRangeStats};
 use crate::error::AppError;
+use tauri::Listener;
 use tauri::{AppHandle, Builder, Manager, tray::{TrayIconBuilder}, menu::{Menu, MenuItem}};
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 
@@ -14,6 +15,11 @@ pub struct SessionState
 {
   paused: Arc<AtomicBool>,
   ended: Arc<AtomicBool>,
+}
+
+pub struct RefreshState
+{
+    refresh_auto_search: Arc<AtomicBool>,
 }
 
 #[tauri::command]
@@ -232,6 +238,21 @@ fn get_processes(game_id: Option<i64>) -> Result<Vec<String>, AppError>
     Ok(get_process_names(game_id)?)
 }
 
+#[tauri::command]
+fn start_auto_search(app: AppHandle) -> Result<(), AppError>
+{
+    let refresh = app.state::<RefreshState>().refresh_auto_search.clone();
+    auto_search(app, refresh)?;
+    Ok(())
+}
+
+pub fn trigger_refresh(app: &AppHandle)
+{
+    app.state::<RefreshState>()
+        .refresh_auto_search
+        .store(true, Ordering::Relaxed);
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() -> Result<(), AppError> {
     let mut builder = Builder::default();
@@ -269,6 +290,7 @@ pub fn run() -> Result<(), AppError> {
             update_game_status,
             insert_process_name,
             get_processes,
+            start_auto_search,
         ])
         .setup(|app| 
         {
@@ -292,14 +314,23 @@ pub fn run() -> Result<(), AppError> {
                 paused: Arc::new(AtomicBool::new(false)),
                 ended: Arc::new(AtomicBool::new(false)),
             });
-            
 
+            app.manage(RefreshState
+            {
+                refresh_auto_search: Arc::new(AtomicBool::new(false)),
+            });
+
+            let handle = app.handle().clone();
+
+            app.listen("start-auto-search", move |_| {
+                start_auto_search(handle.clone()).unwrap();
+            });
+
+            start_auto_search(app.handle().clone())?;
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 
-    
-    
     Ok(())
 }

@@ -1,12 +1,12 @@
 use crate::error::AppError;
 use crate::database_operations::{insert_data, open_connection, SessionRust, get_process_names};
+use crate::trigger_refresh;
 use chrono::{Utc};
 use serde::Serialize;
 use std::{thread, time};
-use std::path::Path;
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Listener, Manager};
 use libsw::{Sw, StopwatchImpl};
 use std::time::Instant;
 use fuzzy_matcher::skim::SkimMatcherV2;
@@ -26,16 +26,6 @@ pub struct Process
 {
     pid: u32,
     name: String,
-}
-
-/// Helper function for removing extension from process names
-fn normalize(string: &str) -> String
-{
-    // Makes a PathBuf from string.
-    let string_path = Path::new(string);
-
-    // Non extension portion of string_path is taken, then converted to string and returned.
-    string_path.file_stem().unwrap_or_default().to_str().unwrap_or_default().to_string()
 }
 
 /// Finds a running process by a user inputted name. Returns a vector with Process structs.
@@ -230,18 +220,37 @@ pub fn end_session(session_notes: &str, mut session_data: SessionRust) -> Result
     
     // The struct data is inserted into the database.
     insert_data(&conn, session_data)?;
+    
+
 
     Ok(())
 }
 
-pub fn auto_search(app: AppHandle) -> Result<(), AppError>
+pub fn auto_search(app: AppHandle, refresh: Arc<AtomicBool>) -> Result<(), AppError>
 {
     let mut process_names = get_process_names(None)?;
     let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()))?;
+
     thread::spawn(move || {
+        let handle = app.app_handle().clone();
+        
+        app.listen("refresh-auto-search", move |_event|
+        {
+            trigger_refresh(&handle);
+        });
+
+        app.listen("stop-auto-search", |event| {
+            return; 
+        });
+
         let sleep_time = time::Duration::from_secs(1);
         'main: loop 
         {
+            if refresh.load(Ordering::Relaxed)
+            {
+                process_names = get_process_names(None).unwrap();
+            }
+
             system.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
             for process in &process_names
             {
@@ -262,20 +271,6 @@ pub fn auto_search(app: AppHandle) -> Result<(), AppError>
 mod tests
 {
     use super::*;
-
-    #[test]
-    fn test_normalise()
-    {
-        assert_eq!(normalize("Game.exe"), "Game");
-        assert_eq!(normalize("GAME.exe"), "GAME");
-        assert_eq!(normalize("game.exe"), "game");
-        assert_eq!(normalize("gamE.exe"), "gamE");
-        assert_eq!(normalize("1029.exe"), "1029");
-        assert_eq!(normalize("!£*($*%).exe"), "!£*($*%)");
-        assert_eq!(normalize("NoExtensionHere"), "NoExtensionHere");
-        assert_eq!(normalize("complex.game.name.exe"), "complex.game.name");
-    }
-
 
     #[test]
     #[ignore]
