@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { Session, GameTimeRangeStats } from "./types.js";
+import type { Session, GameTimeRangeStats } from "./types.svelte.js";
 
 /** Aggregate sessions by local calendar day, returning the seven most recent active days. */
 export function getRecentActivity(sessions: Session[]) {
