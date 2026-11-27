@@ -3,6 +3,7 @@
     import { page } from "$app/state";
     import "../app.css";
     import { Button } from "#lib/components/ui/button/index.ts";
+    import { Toaster } from "#lib/components/ui/sonner/index.js";
     
     // Import the Tauri plugins
     import { check } from '@tauri-apps/plugin-updater';
@@ -75,6 +76,7 @@
         }
     });
 </script>
+<Toaster />
 
 <header class="border-b bg-card">
     <nav aria-label="Main navigation" class="mx-auto flex max-w-7xl flex-wrap items-center justify-between gap-3 p-4">
