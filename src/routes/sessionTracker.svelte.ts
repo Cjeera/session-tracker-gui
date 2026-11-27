@@ -163,6 +163,8 @@ class SessionTracker {
 
     endSession = async (event: Event) => {
         event.preventDefault();
+        this.errorFlag = false;
+        this.errorMsg = "";
 
         // Stops the stopwatch.
         if (this.unlistenStopwatch) {
@@ -201,7 +203,9 @@ class SessionTracker {
             this.stopwatchDisplay = "";
 
         } catch (error) {
+            this.errorFlag = true;
             this.errorMsg = String(error);
+            console.error("Failed to save session:", error);
         }
     }
 }
