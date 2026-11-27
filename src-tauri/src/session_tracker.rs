@@ -231,19 +231,13 @@ pub fn end_session(session_notes: &str, mut session_data: SessionRust) -> Result
     // The struct data is inserted into the database.
     insert_data(&conn, session_data)?;
 
-    if let Err(error) = auto_search()
-    {
-        eprintln!("Failed to restart auto search: {:?}", error);
-    }
-
     Ok(())
 }
 
-pub fn auto_search() -> Result<(), AppError>
+pub fn auto_search(app: AppHandle) -> Result<(), AppError>
 {
-    let process_names = get_process_names(None)?;
+    let mut process_names = get_process_names(None)?;
     let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()))?;
-
     thread::spawn(move || {
         let sleep_time = time::Duration::from_secs(1);
         'main: loop 
@@ -260,7 +254,7 @@ pub fn auto_search() -> Result<(), AppError>
             thread::sleep(sleep_time);
         }
     });
-    
+
     Ok(())
 }
 

@@ -292,8 +292,8 @@ pub fn run() -> Result<(), AppError> {
                 paused: Arc::new(AtomicBool::new(false)),
                 ended: Arc::new(AtomicBool::new(false)),
             });
+            
 
-            auto_search()?;
             Ok(())
         })
         .run(tauri::generate_context!())
