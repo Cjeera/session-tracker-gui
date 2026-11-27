@@ -2,8 +2,8 @@
     import * as Card from "#lib/components/ui/card/index.js";
     import { onMount } from "svelte";
     import { invoke } from "@tauri-apps/api/core";
-    import type { Game, GameCover } from "#lib/types.js";
-    import { config } from "#lib/types.js";
+    import type { Game, GameCover } from "#lib/types.svelte.js";
+    import { config } from "#lib/types.svelte.js";
     import { ask } from "@tauri-apps/plugin-dialog";
 
     // Component state variables

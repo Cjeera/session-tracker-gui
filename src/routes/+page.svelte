@@ -5,9 +5,7 @@
   import { Textarea } from "#lib/components/ui/textarea/index.js";
   import * as Table from "#lib/components/ui/table/index.js";
   import { Play, Pause, Square, X } from "@lucide/svelte";
-
   import { tracker } from "./sessionTracker.svelte.js";
-
   import { onDestroy } from 'svelte';
 
   onDestroy(() => {
@@ -47,6 +45,7 @@
         {#if tracker.errorFlag}
           <p id="search-error" class="text-sm text-destructive" role="alert">{tracker.errorMsg}</p>
         {/if}
+
       </div>
       <Button type="submit" class="mt-4">Enter</Button>
       {#if tracker.successMsg.length > 0}

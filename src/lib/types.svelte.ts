@@ -58,3 +58,7 @@ export interface Cover {
 export const config = {
     coverArtChoice: true
 };
+
+export const autoSearch = $state({
+    autosearchOn: false
+});

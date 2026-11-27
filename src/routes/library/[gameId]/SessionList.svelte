@@ -15,7 +15,7 @@
         formatLocaleDate,
     } from "#lib/timeFormatting.js";
 
-    import type { Session } from "#lib/types.js";
+    import type { Session } from "#lib/types.svelte.js";
     
     import { invoke } from "@tauri-apps/api/core";
 

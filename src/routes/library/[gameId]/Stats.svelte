@@ -6,7 +6,7 @@
     import { curveLinear } from "d3-shape";
     import { formatDuration } from "#lib/timeFormatting.js";
     import { getRecentActivity, getLongestSessions, getWeekdayPlaytime, getGameTimeRangeStats } from "#lib/sessionStats.ts";
-    import type { Session } from "#lib/types.js";
+    import type { Session } from "#lib/types.svelte.js";
     import { fade } from "svelte/transition";
 
     let { sessions, gameId }: { sessions: Session[], gameId: number } = $props();
