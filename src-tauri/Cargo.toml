@@ -15,30 +15,32 @@ name = "session_tracker_gui_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
-tauri-build = { version = "2.7.1", features = [] }
+tauri-build = { version = "2.7.6", features = [] }
 dotenvy = "0.15.7"
 
 
 [dependencies]
-tauri = { version = "2.12.1", features = [] }
-tauri-plugin-opener = "^2.7.0"
+tauri = { version = "2.12.7", features = ["tray-icon"] }
+tauri-plugin-opener = "^2.7.3"
 serde = { version = "^1.0.229", features = ["derive"] }
-serde_json = "^1.0.151"
-rusqlite = { version = "^0.40.2", features = ["chrono", "bundled", "backup"] }
+serde_json = "^1.0.154"
+rusqlite = { version = "^0.43", features = ["chrono", "bundled", "backup"] }
 chrono = { version = "^0.4.45", features = ["serde"] }
-sysinfo = "^0.39.6"
+sysinfo = "^0.40.4"
 csv = "^1.4.0"
 thiserror = "^2.0.21"
 libsw = "^3.5.0"
 fuzzy-matcher = "^0.3.7"
 reqwest = { version = "0.13.5", features= ["json", "form", "query"] }
-tauri-plugin-dialog = "2.8.1"
+tauri-plugin-dialog = "2.8.4"
 tauri-plugin-process = "2.4.0"
 dotenvy = "0.15.7"
+tauri-plugin-notification = "2"
 
 # Only used during testing
 [dev-dependencies]
-tokio = { version = "1.53.2", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1.54.1", features = ["rt-multi-thread", "macros"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
-tauri-plugin-updater = "2.13.1"
+tauri-plugin-autostart = "2"
+tauri-plugin-updater = "2.14.1"
