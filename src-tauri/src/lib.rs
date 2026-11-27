@@ -7,14 +7,14 @@ use crate::api_requests::{get_cover_art, GameCover};
 use crate::session_tracker::{track_session, end_session, process_search, Process, auto_search};
 use crate::database_operations::{get_games, get_stats, get_sessions, get_game_by_id, edit_session_notes, insert_cover_art, update_status, get_game_weekly_playtime, get_game_monthly_playtime, get_game_yearly_playtime, get_global_weekly_playtime, get_global_monthly_playtime, get_global_yearly_playtime, get_process_names, insert_process, Session, SessionRust, Game, GameStats, GameTimeRangeStats, GlobalTimeRangeStats};
 use crate::error::AppError;
-use tauri::Listener;
-use tauri::{AppHandle, Builder, Manager, tray::{TrayIconBuilder}, menu::{Menu, MenuItem}};
+use tauri::{Listener, AppHandle, Builder, Manager, tray::{TrayIconBuilder}, menu::{Menu, MenuItem}};
+use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 
 pub struct SessionState 
 {
-  paused: Arc<AtomicBool>,
-  ended: Arc<AtomicBool>,
+    paused: Arc<AtomicBool>,
+    ended: Arc<AtomicBool>,
 }
 
 pub struct RefreshState
@@ -163,7 +163,7 @@ async fn start_tracker(game_input: String, pid: u32, app: AppHandle) -> Result<(
 }
 
 #[tauri::command]
-async fn toggle_pause(app: AppHandle) -> Result<(), AppError>
+fn toggle_pause(app: AppHandle) -> Result<(), AppError>
 {
     let pause_state = app.state::<SessionState>().paused.clone();
     pause_state.store(true, Ordering::Relaxed);
@@ -172,7 +172,7 @@ async fn toggle_pause(app: AppHandle) -> Result<(), AppError>
 }
 
 #[tauri::command]
-async fn toggle_resume(app: AppHandle) -> Result<(), AppError>
+fn toggle_resume(app: AppHandle) -> Result<(), AppError>
 {
     let pause_state = app.state::<SessionState>().paused.clone();
     pause_state.store(false, Ordering::Relaxed);
@@ -181,7 +181,7 @@ async fn toggle_resume(app: AppHandle) -> Result<(), AppError>
 }
 
 #[tauri::command]
-async fn toggle_end(app: AppHandle) -> Result<(), AppError>
+fn toggle_end(app: AppHandle) -> Result<(), AppError>
 {
     let end_state = app.state::<SessionState>().ended.clone();
     end_state.store(true, Ordering::Relaxed);
@@ -296,29 +296,94 @@ pub fn run() -> Result<(), AppError> {
         {
             use tauri_plugin_autostart::ManagerExt;
 
+            app.manage(SessionState 
+            {
+                paused: Arc::new(AtomicBool::new(false)),
+                ended: Arc::new(AtomicBool::new(true)),
+            });
+
+            
+            app.manage(RefreshState
+            {
+                refresh_auto_search: Arc::new(AtomicBool::new(false)),
+            });
+
             let autostart_manager = app.autolaunch();
             let _ = autostart_manager.enable();
 
-            let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let open_i = MenuItem::with_id(app, "open", "Open Session Tracker", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&quit_i, &open_i])?;
+            let close_i = MenuItem::with_id(app, "close", "Close", true, None::<&str>)?;
+            let exit_i = MenuItem::with_id(app, "exit", "Exit", true, None::<&str>)?;
+            let open_i = MenuItem::with_id(app, "open", "Open", true, None::<&str>)?;
+            let pause_tracker_i = MenuItem::with_id(app, "pause", "Pause Tracker", app.state::<SessionState>().paused.load(Ordering::Relaxed) & !app.state::<SessionState>().ended.load(Ordering::Relaxed), None::<&str>)?;
+            let resume_tracker_i = MenuItem::with_id(app, "resume", "Resume Tracker", !app.state::<SessionState>().paused.load(Ordering::Relaxed) & !app.state::<SessionState>().ended.load(Ordering::Relaxed), None::<&str>)?;
+            let stop_tracker_i = MenuItem::with_id(app, "stop", "Stop Tracker", !app.state::<SessionState>().ended.load(Ordering::Relaxed), None::<&str>)?;
+ 
+            let menu = Menu::with_items(app, &[&pause_tracker_i, &resume_tracker_i, &stop_tracker_i, &open_i, &close_i, &exit_i])?;
                
             let tray = TrayIconBuilder::new()
                 .menu(&menu)
                 .show_menu_on_left_click(true)
                 .icon(app.default_window_icon().unwrap().clone())
-                .build(app)?;
-            
-            app.manage(SessionState 
-            {
-                paused: Arc::new(AtomicBool::new(false)),
-                ended: Arc::new(AtomicBool::new(false)),
-            });
+                .on_menu_event(|app, event| 
+                    {
+                        let window = app.get_webview_window("main").unwrap();
+                        match event.id.as_ref()
+                        {
+                            "close" => 
+                            {
+                                if !window.is_minimized().unwrap()
+                                {
+                                    window.minimize().unwrap();
+                                }
+                            }
 
-            app.manage(RefreshState
-            {
-                refresh_auto_search: Arc::new(AtomicBool::new(false)),
-            });
+                            "exit" => 
+                            {
+                                if !app.state::<SessionState>().ended.load(Ordering::Relaxed)
+                                {
+                                    app.dialog()
+                                        .message("Tracker is running. Close application?")
+                                        .kind(MessageDialogKind::Warning)
+                                        .title("Warning")
+                                        .buttons(tauri_plugin_dialog::MessageDialogButtons::YesNo)
+                                        .show(move |result| match result {
+                                            true => { let _ = &window.destroy().unwrap(); }
+                                            false => {}
+                                        })
+                                }
+                                else 
+                                {
+                                    let _ = &window.destroy().unwrap();
+                                }
+                            }
+
+                            "open" => 
+                            {
+                                if window.is_minimized().unwrap()
+                                {
+                                    window.maximize().unwrap();
+                                }
+                            }
+
+                            "pause" => 
+                            {
+                                let _ = toggle_pause(app.app_handle().clone());
+                            }
+
+                            "resume" => 
+                            {
+                                let _ = toggle_resume(app.app_handle().clone());
+                            }
+
+                            "stop" => 
+                            {
+                                let _ = toggle_end(app.app_handle().clone());
+                            }
+
+                            _ => {}
+                        }
+                    })
+                .build(app)?;
 
             let handle = app.handle().clone();
 
