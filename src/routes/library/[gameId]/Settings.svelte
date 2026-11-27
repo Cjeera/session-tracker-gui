@@ -1,70 +1,128 @@
+
 <script lang="ts">
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
     import Input from "#lib/components/ui/input/input.svelte";
-    import Button, { buttonVariants } from "#lib/components/ui/button/button.svelte";
+    import Button from "#lib/components/ui/button/button.svelte";
     import Label from "#lib/components/ui/label/label.svelte";
 
     let { gameId }: { gameId: number } = $props();
-    
-    let loading = $state(false);
-    let error = $state("");
-    let processName = $state<string>("");
 
-    let processNameEdited = $derived(processName);
+    let loading = $state(false);
+    let saving = $state(false);
+    let error = $state("");
+
+    let processName = $state("");
+    let processNameEdited = $state("");
     let editing = $state(false);
 
-    async function getProccesNames() {
+    async function getProcessNames() {
+        loading = true;
+        error = "";
+
         try {
-            loading = true;
-            processName = await invoke<string>("get_processes", { gameId: gameId });
+            const names = await invoke<string[]>(
+                "get_processes",
+                { gameId }
+            );
+
+            processName = names[0] ?? "";
+            processNameEdited = processName;
+
+        } catch (err) {
+            error = String(err);
+            console.error(err);
+        } finally {
             loading = false;
-        } catch (error) {
-            loading = false;
-            error = error;
-            console.error(error);
         }
     }
 
     async function insertProcess() {
+        saving = true;
+        error = "";
+
         try {
-            await invoke("insert_process_name", { gameId: gameId, processName: processNameEdited });
-            getProccesNames();
+            await invoke("insert_process_name", {
+                gameId,
+                processName: processNameEdited.trim()
+            });
+
+            await getProcessNames();
             editing = false;
-        } catch (error) {
-            error = error;
-            console.error(error);
+
+        } catch (err) {
+            error = String(err);
+            console.error(err);
+        } finally {
+            saving = false;
         }
     }
 
+    function startEditing() {
+        processNameEdited = processName;
+        editing = true;
+    }
+
+    function cancelEditing() {
+        processNameEdited = processName;
+        editing = false;
+        error = "";
+    }
+
     onMount(() => {
-        getProccesNames();
-    })
+        getProcessNames();
+    });
 </script>
 
 {#if loading}
     <div class="justify-items-center">
         <p>Loading settings...</p>
     </div>
-{:else if !loading && !error}
-    <Label class="text-lg border-b-2">Process Name</Label>
+{:else}
+    <Label class="text-lg border-b-2">
+        Process Name
+    </Label>
+
     <div class="flex items-center max-w-lg p-2 gap-2">
-        {#if processName.length > 0}
+        {#if editing || !processName}
+            <Input
+                type="text"
+                bind:value={processNameEdited}
+                placeholder="Process name..."
+            />
+
+            <Button
+                class="cursor-pointer"
+                variant="outline"
+                disabled={saving || !processNameEdited.trim()}
+                onclick={insertProcess}
+            >
+                {saving ? "Saving..." : "Submit"}
+            </Button>
+
             {#if editing}
-                <Input required type="text" bind:value={processNameEdited} placeholder="Process name..." />
-                <Button class="cursor-pointer" variant="outline" onclick={async () => await insertProcess()}>Submit</Button>
-                <Button class="cursor-pointer" variant="outline" onclick={() => editing = false}>Cancel</Button>
-            {:else}
-                <p class="text-balance">{processName[0]}</p>
-                <Button class="cursor-pointer" variant="outline" onclick={() => editing = true}>Edit</Button>
+                <Button
+                    class="cursor-pointer"
+                    variant="outline"
+                    onclick={cancelEditing}
+                >
+                    Cancel
+                </Button>
             {/if}
         {:else}
-            <Input required type="text" class="max-w-lg" bind:value={processNameEdited} placeholder="Process name..." />
-            <Button class="cursor-pointer" variant="outline" >Submit</Button>
+            <p class="text-balance">{processName}</p>
+
+            <Button
+                class="cursor-pointer"
+                variant="outline"
+                onclick={startEditing}
+            >
+                Edit
+            </Button>
         {/if}
     </div>
-{:else}
-    <div class="justify-items-center">
-        <p>{error}</p>
-    </div>
+
+    {#if error}
+        <p class="text-red-500 p-2">{error}</p>
+    {/if}
 {/if}
