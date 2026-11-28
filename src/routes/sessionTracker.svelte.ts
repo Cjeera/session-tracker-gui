@@ -7,6 +7,7 @@ import type { SessionRust, Process } from "#lib/types.svelte.js";
 class SessionTracker {
     unlistenStopwatch: UnlistenFn | null = null;
     unlistenSessionEnd: UnlistenFn | null = null;
+    unlistenSessionStateChange: UnlistenFn | null = null;
 
     // Seconds, minutes and hours, which will be formatted into HH:MM:SS.
     seconds = $state(0);
@@ -90,6 +91,20 @@ class SessionTracker {
         if (this.unlistenSessionEnd) {
             this.unlistenSessionEnd();
         }
+
+        if (this.unlistenSessionStateChange) {
+            this.unlistenSessionStateChange();
+        }
+
+        this.unlistenSessionStateChange = await listen("session-state-change", async (event) => {
+            if (event.payload === "paused") {
+                this.paused = true;
+            } else if (event.payload === "resumed") {
+                this.paused = false;
+            } else if (event.payload === "ended") {
+                await this.userStopSession();
+            }
+        });
 
         // A listener is set up which will get the elapsed time in ms.
         this.unlistenStopwatch = await listen<{ elapsedMs: number }>("stopwatch-tick", (event) => {
