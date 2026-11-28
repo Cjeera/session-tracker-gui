@@ -1,5 +1,4 @@
 <script lang="ts">
-    import TrendingUpIcon from "@lucide/svelte/icons/trending-up";
     import { BarChart, PieChart, AreaChart } from "layerchart";
     import * as Chart from "#lib/components/ui/chart/index.js";
     import * as Card from "#lib/components/ui/card/index.js";
