@@ -225,11 +225,11 @@ fn map_game_stats(row: &rusqlite::Row<'_>) -> Result<GameStats, rusqlite::Error>
     })
 }
 
-/// Gets total playtime, total sessions and the timestamp of the previous session.
-pub fn get_stats(game_id: i64) -> Result<GameStats, AppError>
+fn get_stats_with_conn(
+    conn: &Connection,
+    game_id: i64
+) -> Result<GameStats, AppError>
 {
-    let conn = open_connection()?;
-
     let mut query = conn.prepare(
         " WITH totals as (
                 SELECT
@@ -276,6 +276,15 @@ pub fn get_stats(game_id: i64) -> Result<GameStats, AppError>
     }
 
     Ok(game_stats)
+}
+
+/// Gets total playtime, total sessions and the timestamp of the previous session.
+pub fn get_stats(game_id: i64) -> Result<GameStats, AppError>
+{
+    let conn = open_connection()?;
+
+    get_stats_with_conn(&conn, game_id)
+
 }
 
 pub fn get_game_by_id(game_id: i64) -> Result<Game, AppError>
@@ -731,40 +740,49 @@ mod db_query_tests
     }
 
     #[test]
-    fn test_insert_and_get_stats() 
+    fn test_insert_and_get_stats()
     {
         let conn = setup_memory_db();
-        
-        // Inserts a game
-        conn.execute("INSERT INTO games (title) VALUES ('Test Game 1')", []).unwrap();
+
+        conn.execute(
+            "INSERT INTO games (title) VALUES ('Test Game 1')",
+            []
+        ).unwrap();
+
         let game_id = conn.last_insert_rowid();
 
-        // Inserts two sessions for this game
         conn.execute(
-            "INSERT INTO sessions (game_id, start_ts, end_ts, duration_seconds, notes) 
-             VALUES (?1, '2023-10-01T12:00:00Z', '2023-10-01T13:00:00Z', 3600, 'Beat the first boss')",
-             [&game_id]
+            "INSERT INTO sessions
+                (game_id, start_ts, end_ts, duration_seconds, notes)
+            VALUES
+                (?1, '2023-10-01T12:00:00Z',
+                '2023-10-01T13:00:00Z', 3600, 'Beat the first boss')",
+            [&game_id]
         ).unwrap();
 
         conn.execute(
-            "INSERT INTO sessions (game_id, start_ts, end_ts, duration_seconds, notes) 
-             VALUES (?1, '2023-10-02T12:00:00Z', '2023-10-02T12:30:00Z', 1800, 'Grinding')",
-             [&game_id]
+            "INSERT INTO sessions
+                (game_id, start_ts, end_ts, duration_seconds, notes)
+            VALUES
+                (?1, '2023-10-02T12:00:00Z',
+                '2023-10-02T12:30:00Z', 1800, 'Grinding')",
+            [&game_id]
         ).unwrap();
 
-        // Replicate the get_stats logic.
-        let mut query = conn.prepare(
-            "SELECT game_id, COALESCE(SUM(duration_seconds), 0), COUNT(session_id), MAX(start_ts) 
-             FROM sessions WHERE game_id = ?1;"
-        ).unwrap();
-        
-        let stats = query.query_row([&game_id], map_game_stats).unwrap();
+        let stats = get_stats_with_conn(&conn, game_id).unwrap();
 
-        // Assert correctness
         assert_eq!(stats.game_id, game_id);
-        assert_eq!(stats.total_playtime, 5400); // 3600 + 1800 seconds
+        assert_eq!(stats.total_playtime, 5400);
         assert_eq!(stats.total_sessions, 2);
-        assert_eq!(stats.last_played.unwrap(), "2023-10-02T12:00:00Z");
+
+        assert_eq!(
+            stats.last_played.as_deref(),
+            Some("2023-10-02T12:00:00Z")
+        );
+
+        assert_eq!(stats.average_session_length, 2700.0);
+        assert_eq!(stats.average_start_time.as_deref(), Some("12:00"));
+        assert_eq!(stats.average_end_time.as_deref(), Some("12:45"));
     }
 
     #[test]
