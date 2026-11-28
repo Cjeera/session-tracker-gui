@@ -34,6 +34,12 @@ pub enum AppError
 
     #[error("No Game Found!")]
     NotFound(),
+
+    #[error("sysinfo error: {0}")]
+    SysInfo(#[from] sysinfo::Error),
+
+    #[error("{0}")]
+    Tauri(#[from] tauri::Error),
 }
 
 impl Serialize for AppError

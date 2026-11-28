@@ -83,7 +83,7 @@ jobs:
 
       # Build and Publish with Tauri Action
       - name: Build and Publish Tauri App
-        uses: tauri-apps/tauri-action@v0.6.1
+        uses: tauri-apps/tauri-action@v1.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -93,7 +93,7 @@ jobs:
         with:
           tagName: app-v__VERSION__
           releaseName: 'Session Tracker GUI v__VERSION__'
-          releaseBody: 'Added backlogging feature and last played stat.'
+          releaseBody: 'Added an auto search feature. Games will now have their process name saved, and the tracker will start automatically if it detects a game running with a saved process name.'
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}

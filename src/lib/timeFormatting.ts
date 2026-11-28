@@ -17,9 +17,12 @@ export function formatTime(timestampString: string) {
 }
 
 export function formatDuration(durationSeconds: number) {
-    let hours = Math.floor(durationSeconds / 3600);
-    let minutes = Math.floor((durationSeconds % 3600) / 60);
-    let seconds = durationSeconds % 60;
-    
-    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+    const totalSeconds = Math.round(durationSeconds);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    return [hours, minutes, seconds]
+        .map(value => String(value).padStart(2, "0"))
+        .join(":");
 }

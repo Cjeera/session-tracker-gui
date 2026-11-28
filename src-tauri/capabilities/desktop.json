@@ -11,6 +11,8 @@
   "permissions": [
     "updater:default",
     "dialog:default",
-    "process:default"
+    "process:default",
+    "autostart:default",
+    "notification:default"
   ]
 }

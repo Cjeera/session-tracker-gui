@@ -43,7 +43,7 @@ impl Cover
             self.url = format!("https:{}", self.url);
         }
 
-        self.url = self.url.replace("t_thumb", "t_cover_big");
+        self.url = self.url.replace("t_thumb", "t_1080p");
     }
 }
 

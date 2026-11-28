@@ -1,16 +1,17 @@
 use crate::error::AppError;
-use crate::database_operations::{insert_data, open_connection, SessionRust};
+use crate::{RefreshState, SessionState, TrackerStatus, refresh_tray_menu, trigger_refresh};
+use crate::database_operations::{insert_data, open_connection, SessionRust, get_process_names};
 use chrono::{Utc};
 use serde::Serialize;
 use std::{thread, time};
-use std::path::Path;
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 use sysinfo::{Pid, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use libsw::{Sw, StopwatchImpl};
 use std::time::Instant;
 use fuzzy_matcher::skim::SkimMatcherV2;
 use fuzzy_matcher::FuzzyMatcher;
+use std::ffi::OsStr;
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,21 +28,11 @@ pub struct Process
     name: String,
 }
 
-/// Helper function for removing extension from process names
-fn normalize(string: &str) -> String
-{
-    // Makes a PathBuf from string.
-    let string_path = Path::new(string);
-
-    // Non extension portion of string_path is taken, then converted to string and returned.
-    string_path.file_stem().unwrap_or_default().to_str().unwrap_or_default().to_string()
-}
-
 /// Finds a running process by a user inputted name. Returns a vector with Process structs.
 pub fn process_search(game_input: &str) -> Result<Vec<Process>, AppError> 
 {
     // Gets a list of all running processes.
-    let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()));
+    let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()))?;
 
     // Refreshes the process list.
     system.refresh_processes(ProcessesToUpdate::All, true);
@@ -60,7 +51,7 @@ pub fn process_search(game_input: &str) -> Result<Vec<Process>, AppError>
         {
             Some(found_score) =>
             {
-                matches.push((found_score, Process { pid: (process.pid().as_u32()), name: (process.name().to_str().unwrap().to_string()) }));
+                matches.push((found_score, Process { pid: (process.pid().as_u32()), name: (process.name().to_string_lossy().into_owned()) }));
             }       
             None => continue     
         };
@@ -81,18 +72,15 @@ pub fn process_search(game_input: &str) -> Result<Vec<Process>, AppError>
     // Loops through matches struct.
     for entry in matches
     {
-        // The extension is removed from the process name.
-        let name_norm = normalize(&entry.1.name);
-
-        // Process ID from matches vector and normalised name are pushed into search_results.
-        search_results.push(Process { pid: entry.1.pid, name: name_norm} );
+        // Process ID from matches vector and name are pushed into search_results.
+        search_results.push(Process { pid: entry.1.pid, name: entry.1.name} );
     }
 
     Ok(search_results)
 }
 
 /// Checks if a specific process is still running.
-fn process_exists(system: &mut System, pid: Pid) -> bool 
+pub fn process_exists(system: &mut System, pid: Pid) -> bool 
 {
     system.refresh_processes(ProcessesToUpdate::Some(&[pid]), true);
     system.process(pid).is_some()
@@ -108,130 +96,141 @@ fn stopwatch_tick(app: &AppHandle, stopwatch: &StopwatchImpl<Instant>)
     };
 
     // The payload struct with the elapsed time is sent to the frontend.
-    app.emit("stopwatch-tick", payload).unwrap();
-}
-
-/// Function that stops the stopwatch.
-fn stopwatch_stop(app: &AppHandle, stopwatch: &mut StopwatchImpl<Instant>) -> Result<u128, AppError>
-{
-    // Stops the stopwatch
-    let _ = stopwatch.stop();
-
-    // Gets the elapsed time in milliseconds from the stopwatch.
-    let payload = StopwatchPayload
-    {
-        elapsed_ms: stopwatch.elapsed().as_millis(),
-    };
-
-    // The payload struct is sent to the frontend.
-    app.emit("stopwatch-tick", payload).unwrap();
-
-    Ok(stopwatch.elapsed().as_millis())
+    if let Err(error) = app.emit("stopwatch-tick", payload) { eprintln!("{error}"); }
 }
 
 /// Tracks a running application's session time. Returns a struct containing session data.
-pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<AtomicBool>, ended: Arc<AtomicBool>) -> Result<(), AppError>
+pub fn track_session(game_input: String, pid: u32, app: AppHandle) -> Result<(), AppError>
 {
-    // Gets a list of all running processes.
-    let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()));
-
-    // Returns early if process doesn't exist
-    if !process_exists(&mut system, Pid::from_u32(pid))
+    let pid = Pid::from_u32(pid);
+    let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()))?;
+    let session = app.state::<SessionState>();
     {
-        return Err(AppError::NotFound())
+        let mut status = session.status.lock().unwrap();
+        if !matches!(*status, TrackerStatus::Idle) && *status != TrackerStatus::GameDetected(pid.as_u32()) {
+            return Err(AppError::Message("A session is already active or awaiting submission".into()));
+        }
+        if !process_exists(&mut system, pid) {
+            *status = TrackerStatus::Idle;
+            return Err(AppError::NotFound());
+        }
+        *status = TrackerStatus::Running;
     }
-
-    // Start timestamp is taken.
+    let process_start = system.process(pid).map(|p| p.start_time()).unwrap_or(0);
     let start = Utc::now();
- 
-    // Sets the amount of time that the thread will sleep for.
-    let sleep_time = time::Duration::from_secs(1);
-
-    // A new thread is created which contains the process exists check. 
-    // Thread sleeps for 1 second, then checks if found process is still running. Loop repeats if still running.
-    thread::spawn(move || 
-    {
-        // A stopwatch is created that will be sent to the frontend.
+    let worker_app = app.clone();
+    thread::spawn(move || {
+        let app = worker_app;
+        let session = app.state::<SessionState>();
         let mut stopwatch = Sw::new_started();
-
-        let pid = Pid::from_u32(pid);
-
-        loop 
-        {
-            thread::sleep(sleep_time);
-
-            // Exits the loop if the program isn't running or the user stops the session.
-            if !process_exists(&mut system, pid) || ended.load(Ordering::Relaxed)
-            {
+        loop {
+            let status = *session.status.lock().unwrap();
+            if status == TrackerStatus::Stopping || !process_exists(&mut system, pid)
+                || system.process(pid).map(|p| p.start_time()) != Some(process_start) {
                 break;
             }
-
-            // If/esle block that handles pause and resume.
-            if pause.load(Ordering::Relaxed)
-            {
-                // If stopwatch isn't stopped, meaning the user has clicked pause, stopwatch is stopped.
-                if !stopwatch.is_stopped()
-                {
-                    let _ = stopwatch.stop();
-                }
+            if status == TrackerStatus::Paused {
+                if !stopwatch.is_stopped() { let _ = stopwatch.stop(); }
+            } else if status == TrackerStatus::Running {
+                if stopwatch.is_stopped() { let _ = stopwatch.start(); }
             }
-            else 
-            {
-                // If stopwatch is stopped, meaning the user has clicked resume, stowpatch is started.
-                if stopwatch.is_stopped()
-                {
-                    let _ = stopwatch.start();
-                }
-                
-                stopwatch_tick(&app, &stopwatch);     
-            }
+            stopwatch_tick(&app, &stopwatch);
+            thread::sleep(time::Duration::from_secs(1));
         }
-
-        // End timestamp is taken.
         let end = Utc::now();
-
-        // Elapsed time is taken from stopwatch.
-        let stopwatch_elapsed = stopwatch_stop(&app, &mut stopwatch).unwrap();
-
-        // The duration in seconds is calculated from elapsed time.
-        let duration_seconds = (stopwatch_elapsed / 1000) as i64;
-
-        // The data is gathered into the session_data struct.
-        let session_data = SessionRust
-        {
-            game: game_input.to_string(),
+        let _ = stopwatch.stop();
+        stopwatch_tick(&app, &stopwatch);
+        let duration_seconds = (stopwatch.elapsed().as_millis() / 1000) as i64;
+        // Do not rediscover the same instance if the user manually stopped it.
+        session.dismissed.lock().unwrap().insert((pid.as_u32(), process_start));
+        *session.status.lock().unwrap() = TrackerStatus::AwaitingSubmission;
+        if let Err(error) = refresh_tray_menu(&app) { eprintln!("{error}"); }
+        let session_data = SessionRust {
+            game: game_input.clone(),
             start_ts: start,
             end_ts: end,
-            duration_seconds: duration_seconds,
+            duration_seconds,
             notes: None,
+            process_name: game_input,
         };
-
-        app.emit("session-ended", session_data).unwrap();
- 
+        if let Err(error) = app.emit("session-ended", session_data) { eprintln!("{error}"); }
     });
-
-    
     Ok(())
 }
 
-/// Handles sending data to be inserted into the db.
-pub fn end_session(session_notes: &str, mut session_data: SessionRust) -> Result<(), AppError>
+/// Save the completed session before allowing automatic detection again.
+pub fn end_session(app: AppHandle, session_notes: &str, mut session_data: SessionRust) -> Result<(), AppError>
 {
-    // Sets sessions notes to None if empty, assigns Some(session_notes) to the struct field if not. 
-    if session_notes.is_empty()
-    {
-        session_data.notes = None;
+    let session = app.state::<SessionState>();
+    let mut status = session.status.lock().unwrap();
+    if *status != TrackerStatus::AwaitingSubmission {
+        return Err(AppError::Message("No completed session is awaiting submission".into()));
     }
-    else 
-    {
-        session_data.notes = Some(session_notes.to_string());   
-    }
-
+    session_data.notes = if session_notes.is_empty() { None } else { Some(session_notes.to_string()) };
     let conn = open_connection()?;
-    
-    // The struct data is inserted into the database.
     insert_data(&conn, session_data)?;
+    trigger_refresh(&app);
+    *status = TrackerStatus::Idle;
+    Ok(())
+}
 
+/// One persistent worker. The switch enables scanning, not thread creation.
+pub fn auto_search(app: AppHandle, refresh: Arc<AtomicBool>) -> Result<(), AppError>
+{
+    let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()))?;
+    thread::spawn(move || {
+        let mut process_names = Vec::<String>::new();
+        let session = app.state::<SessionState>();
+        let settings = app.state::<RefreshState>();
+        let mut pending_since: Option<Instant> = None;
+        loop {
+            thread::sleep(time::Duration::from_secs(1));
+            if !settings.enabled.load(Ordering::Relaxed) { continue; }
+            if refresh.swap(false, Ordering::Relaxed) {
+                match get_process_names(None) {
+                    Ok(names) => process_names = names,
+                    Err(error) => {
+                        eprintln!("Process list refresh failed: {error}");
+                        refresh.store(true, Ordering::Relaxed);
+                        continue;
+                    }
+                }
+            }
+            // Release an unacknowledged detection if the frontend never starts it.
+            {
+                let mut status = session.status.lock().unwrap();
+                if matches!(*status, TrackerStatus::GameDetected(_)) {
+                    if pending_since.is_some_and(|t| t.elapsed() >= time::Duration::from_secs(10)) {
+                        *status = TrackerStatus::Idle;
+                    } else { continue; }
+                }
+                if *status != TrackerStatus::Idle { continue; }
+            }
+            system.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
+            let candidate = {
+                let mut dismissed = session.dismissed.lock().unwrap();
+                dismissed.retain(|(pid, start)| system.process(Pid::from_u32(*pid)).is_some_and(|p| p.start_time() == *start));
+                process_names.iter().filter(|name| !name.trim().is_empty()).find_map(|name| {
+                    system.processes_by_exact_name(OsStr::new(name)).find(|p| {
+                        p.exists() && !dismissed.contains(&(p.pid().as_u32(), p.start_time()))
+                    }).map(|p| Process { pid: p.pid().as_u32(), name: p.name().to_string_lossy().into_owned() })
+                })
+            };
+            if let Some(found) = candidate {
+                {
+                    let mut status = session.status.lock().unwrap();
+                    if *status != TrackerStatus::Idle || !settings.enabled.load(Ordering::Relaxed) { continue; }
+                    *status = TrackerStatus::GameDetected(found.pid);
+                    pending_since = Some(Instant::now());
+                }
+                if let Err(error) = app.emit("auto-search-game-found", found.clone()) {
+                    eprintln!("{error}");
+                    let mut status = session.status.lock().unwrap();
+                    if *status == TrackerStatus::GameDetected(found.pid) { *status = TrackerStatus::Idle; }
+                }
+            }
+        }
+    });
     Ok(())
 }
 
@@ -239,20 +238,6 @@ pub fn end_session(session_notes: &str, mut session_data: SessionRust) -> Result
 mod tests
 {
     use super::*;
-
-    #[test]
-    fn test_normalise()
-    {
-        assert_eq!(normalize("Game.exe"), "Game");
-        assert_eq!(normalize("GAME.exe"), "GAME");
-        assert_eq!(normalize("game.exe"), "game");
-        assert_eq!(normalize("gamE.exe"), "gamE");
-        assert_eq!(normalize("1029.exe"), "1029");
-        assert_eq!(normalize("!£*($*%).exe"), "!£*($*%)");
-        assert_eq!(normalize("NoExtensionHere"), "NoExtensionHere");
-        assert_eq!(normalize("complex.game.name.exe"), "complex.game.name");
-    }
-
 
     #[test]
     #[ignore]

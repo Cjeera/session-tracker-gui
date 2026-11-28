@@ -25,10 +25,11 @@ pub struct SessionRust
     pub end_ts: DateTime<Utc>,
     pub duration_seconds: i64,
     pub notes: Option<String>,
+    pub process_name: String,
 }
 
 /// A struct for storing game IDs, game titles and cover art.
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Game
 {
@@ -39,14 +40,36 @@ pub struct Game
 }
 
 /// A struct for play time info on a specific game.
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 #[serde(rename_all = "camelCase")]
-pub struct GameStats
+pub struct GameStats 
 {
     game_id: i64,
     total_playtime: i64,
     total_sessions: i64,
     last_played: Option<String>,
+    average_session_length: f64,
+    average_start_time: Option<String>,
+    average_end_time: Option<String>,
+}
+
+/// A struct for game play time info for a specific time range.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GameTimeRangeStats
+{
+    game_id: i64,
+    range: String,
+    total_playtime: i64,
+}
+
+/// A struct for global play time info for a specific time range.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GlobalTimeRangeStats
+{
+    range: String,
+    total_playtime: i64
 }
 
 /// Opens and returns a sqlite connection.
@@ -70,6 +93,25 @@ fn map_sessions(row: &rusqlite::Row<'_>) -> Result<Session, rusqlite::Error>
         end_ts: row.get(2)?,
         duration_seconds: row.get(3)?,
         notes: row.get(4)?,
+    })
+}
+
+fn map_game_playtime(row: &rusqlite::Row<'_>) -> Result<GameTimeRangeStats, rusqlite::Error> 
+{
+    Ok(GameTimeRangeStats 
+    {
+        game_id: row.get(0)?,
+        range: row.get(1)?,
+        total_playtime: row.get(2)?,
+    })
+}
+
+fn map_global_playtime(row: &rusqlite::Row<'_>) -> Result<GlobalTimeRangeStats, rusqlite::Error> 
+{
+    Ok(GlobalTimeRangeStats 
+    {
+        range: row.get(0)?,
+        total_playtime: row.get(1)?,
     })
 }
 
@@ -106,6 +148,47 @@ fn map_games(row: &rusqlite::Row<'_>) -> Result<Game, rusqlite::Error>
     })
 }
 
+pub fn get_process_names(game_id: Option<i64>) -> Result<Vec<String>, AppError>
+{
+    let conn = open_connection()?;
+
+
+    if game_id.is_some()
+    {
+        let query_string = "
+            SELECT
+                process_name
+            FROM games
+                WHERE process_name IS NOT NULL AND game_id = ?1;
+        ";
+        let mut query = conn.prepare(query_string)?;
+
+        let process_names: Vec<String> = query.query_map([game_id.unwrap()], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<String>, rusqlite::Error>>()?;
+
+        return Ok(process_names)
+    }
+    else if game_id.is_none()
+    {
+        let query_string = "
+            SELECT
+                process_name
+            FROM games
+                WHERE process_name IS NOT NULL;
+        ";
+        let mut query = conn.prepare(query_string)?;
+
+        let process_names: Vec<String> = query.query_map([], |row| row.get::<_, String>(0))?
+            .collect::<Result<Vec<String>, rusqlite::Error>>()?;
+
+        return Ok(process_names)
+    } 
+    else
+    {
+        return Err(AppError::Message("huh?".to_string()))
+    };
+}
+
 /// Gets all games in the database and the path to it's cover art.
 pub fn get_games() -> Result<Vec<Game>, AppError>
 {
@@ -136,6 +219,9 @@ fn map_game_stats(row: &rusqlite::Row<'_>) -> Result<GameStats, rusqlite::Error>
         total_playtime: row.get(1)?,
         total_sessions: row.get(2)?,
         last_played: row.get(3)?,
+        average_session_length: row.get(4)?,
+        average_start_time: row.get(5)?,
+        average_end_time: row.get(6)?,
     })
 }
 
@@ -145,13 +231,41 @@ pub fn get_stats(game_id: i64) -> Result<GameStats, AppError>
     let conn = open_connection()?;
 
     let mut query = conn.prepare(
-        "SELECT
-            game_id,
-            COALESCE(SUM(duration_seconds), 0),
-            COUNT(session_id),
-            MAX(start_ts)
-        FROM sessions
-        WHERE game_id = ?1;")?;
+        " WITH totals as (
+                SELECT
+                    ?1 AS game_id,
+                    COALESCE(SUM(duration_seconds), 0) AS total_duration_seconds,
+                    COUNT(session_id) AS session_count,
+                    MAX(start_ts) AS last_start_ts,
+                    COALESCE(AVG(duration_seconds), 0.0) AS avg_duration_seconds,
+                    AVG(SIN(2 * PI() * CAST(strftime('%s', start_ts) AS INTEGER) / 86400.0)) AS start_sin,
+                    AVG(COS(2 * PI() * CAST(strftime('%s', start_ts) AS INTEGER) / 86400.0)) AS start_cos,
+                    AVG(SIN(2 * PI() * CAST(strftime('%s', end_ts) AS INTEGER) / 86400.0)) AS end_sin,
+                    AVG(COS(2 * PI() * CAST(strftime('%s', end_ts) AS INTEGER) / 86400.0)) AS end_cos
+                FROM sessions
+                WHERE game_id = ?1
+        ),
+        means AS (
+            SELECT *,
+                (CAST(ROUND(ATAN2(start_sin, start_cos) * 86400.0 / (2 * PI()))
+                    AS INTEGER) + 86400) % 86400 AS start_seconds,
+                (CAST(ROUND(ATAN2(end_sin, end_cos) * 86400.0 / (2 * PI()))
+                    AS INTEGER) + 86400) % 86400 AS end_seconds
+            FROM totals
+        )
+        SELECT
+            ?1 AS game_id,
+            total_duration_seconds,
+            session_count,
+            last_start_ts,
+            avg_duration_seconds,
+            CASE WHEN start_seconds IS NOT NULL
+                THEN printf('%02d:%02d', start_seconds / 3600, start_seconds % 3600 / 60)
+            END AS avg_start_time,
+            CASE WHEN end_seconds IS NOT NULL
+                THEN printf('%02d:%02d', end_seconds / 3600, end_seconds % 3600 / 60)
+            END AS avg_end_time
+        FROM means;")?;
     
     let mut game_stats = query.query_row([&game_id], map_game_stats)?;
 
@@ -197,6 +311,114 @@ pub fn update_status(game_id: i64, status: &str) -> Result<(), AppError>
     Ok(())
 }
 
+pub fn get_game_weekly_playtime(game_id: i64) -> Result<Vec<GameTimeRangeStats>, AppError>
+{
+    let conn = open_connection()?;
+
+    let mut query = conn.prepare(
+        "SELECT
+            ?1 AS game_id, 
+            strftime('%Y-%W', start_ts) as week,
+            SUM(duration_seconds) as total_playtime_weekly
+        FROM sessions
+        WHERE game_id = ?1
+        GROUP BY week;"
+    )?;
+
+    let result: Vec<GameTimeRangeStats> = query.query_map([game_id], map_game_playtime)?.collect::<Result<_,_>>()?;
+
+    Ok(result)
+}
+
+pub fn get_game_monthly_playtime(game_id: i64) -> Result<Vec<GameTimeRangeStats>, AppError>
+{
+    let conn = open_connection()?;
+
+    let mut query = conn.prepare(
+        "SELECT
+            ?1 AS game_id, 
+            strftime('%Y-%m', start_ts) as month,
+            SUM(duration_seconds) as total_playtime_monthly
+        FROM sessions
+        WHERE game_id = ?1
+        GROUP BY month;"
+    )?;
+
+    let result: Vec<GameTimeRangeStats> = query.query_map([game_id], map_game_playtime)?.collect::<Result<_,_>>()?;
+
+    Ok(result)
+}
+
+pub fn get_game_yearly_playtime(game_id: i64) -> Result<Vec<GameTimeRangeStats>, AppError>
+{
+    let conn = open_connection()?;
+
+    let mut query = conn.prepare(
+        "SELECT
+            ?1 AS game_id, 
+            strftime('%Y', start_ts) as year,
+            SUM(duration_seconds) as total_playtime_yearly
+        FROM sessions
+        WHERE game_id = ?1
+        GROUP BY year;"
+    )?;
+
+    let result: Vec<GameTimeRangeStats> = query.query_map([game_id], map_game_playtime)?.collect::<Result<_,_>>()?;
+
+    Ok(result)
+}
+
+pub fn get_global_weekly_playtime() -> Result<Vec<GlobalTimeRangeStats>, AppError>
+{
+    let conn = open_connection()?;
+
+    let mut query = conn.prepare(
+        "SELECT 
+            strftime('%Y-%W', start_ts) as week,
+            SUM(duration_seconds) as total_playtime_weekly
+        FROM sessions
+        GROUP BY week;"
+    )?;
+
+    let result: Vec<GlobalTimeRangeStats> = query.query_map([], map_global_playtime)?.collect::<Result<_,_>>()?;
+
+    Ok(result)
+}
+
+pub fn get_global_monthly_playtime() -> Result<Vec<GlobalTimeRangeStats>, AppError>
+{
+    let conn = open_connection()?;
+
+    let mut query = conn.prepare(
+        "SELECT 
+            strftime('%Y-%m', start_ts) as month,
+            SUM(duration_seconds) as total_playtime_monthly
+        FROM sessions
+        GROUP BY month;"
+    )?;
+
+    let result: Vec<GlobalTimeRangeStats> = query.query_map([], map_global_playtime)?.collect::<Result<_,_>>()?;
+
+    Ok(result)
+}
+
+pub fn get_global_yearly_playtime() -> Result<Vec<GlobalTimeRangeStats>, AppError>
+{
+    let conn = open_connection()?;
+
+    let mut query = conn.prepare(
+        "SELECT 
+            strftime('%Y', start_ts) as year,
+            SUM(duration_seconds) as total_playtime_yearly
+        FROM sessions
+        GROUP BY year;"
+    )?;
+
+    let result: Vec<GlobalTimeRangeStats> = query.query_map([], map_global_playtime)?.collect::<Result<_,_>>()?;
+
+    Ok(result)
+}
+
 /// Creates the tables used in the program.
 pub fn create_tables(conn: &Connection) -> Result<(), AppError>
 {
@@ -205,7 +427,8 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError>
         CREATE TABLE IF NOT EXISTS games (
             game_id INTEGER PRIMARY KEY,
             title TEXT UNIQUE NOT NULL,
-            status TEXT
+            status TEXT,
+            process_name TEXT
         );
 
         CREATE TABLE IF NOT EXISTS sessions (
@@ -222,73 +445,82 @@ pub fn create_tables(conn: &Connection) -> Result<(), AppError>
             game_id INTEGER PRIMARY KEY,
             path TEXT UNIQUE,
             FOREIGN KEY (game_id) REFERENCES games(game_id) ON DELETE CASCADE
-        );"
+        );
+        "
     )?;
 
     Ok(())
 }
 
-/// Inserts session into database.
 pub fn insert_data(conn: &Connection, session_data: SessionRust) -> Result<(), AppError>
 {
-    // Returns early if title is empty or duration is negative.
     if session_data.game.trim().is_empty()
     {
-        return Err(AppError::Message("title cannot be empty!".to_string()))
+        return Err(AppError::Message(
+            "Title cannot be empty!".to_string()
+        ));
     }
 
     if session_data.duration_seconds.is_negative()
     {
-        return Err(AppError::Message("Duration cannot be negative!".to_string()))
+        return Err(AppError::Message(
+            "Duration cannot be negative!".to_string()
+        ));
     }
 
     create_tables(conn)?;
 
-    // Converts the timestamps to an RFC3339 formatted string.
     let start_str = session_data.start_ts.to_rfc3339();
     let end_str = session_data.end_ts.to_rfc3339();
 
-    let db_result = || -> Result<(), AppError>
-    {
-        // Inserts game title into db. Doesn't insert if value already exists.
-        conn.execute(
-            "INSERT OR IGNORE INTO games (title)
-                VALUES (?1)",
-        (
+    let tx = conn.unchecked_transaction()?;
+
+    // Inserts the game if it doesn't exist.
+    // Populates the process name if one hasn't been assigned.
+    tx.execute(
+        "INSERT INTO games (title, process_name)
+         VALUES (?1, NULLIF(?2, ''))
+         ON CONFLICT(title) DO UPDATE
+         SET process_name = excluded.process_name
+         WHERE games.process_name IS NULL
+            OR games.process_name = '';",
+        params![
             &session_data.game,
-        ))?;
+            &session_data.process_name
+        ]
+    )?;
 
-        // Gets the id of the game via it's title.
-        let game_id: i64 = conn.query_row(
-            "SELECT game_id
-                FROM games
-            WHERE title = ?1;", 
-        [&session_data.game], |row| row.get(0))?;
+    // Gets the game ID after inserting the game.
+    let game_id: i64 = tx.query_row(
+        "SELECT game_id
+         FROM games
+         WHERE title = ?1;",
+        [&session_data.game],
+        |row| row.get(0)
+    )?;
 
-        // Inserts the session data into the db, using the game_id from the previous query,
-        conn.execute(
-            "INSERT INTO sessions (game_id, start_ts, end_ts, duration_seconds, notes)
-                VALUES (?1, ?2, ?3, ?4, ?5)",
-        (
-            &game_id,
-            &start_str,
-            &end_str,
-            &session_data.duration_seconds,
-            &session_data.notes,
-        ))?;
+    // Inserts the session.
+    tx.execute(
+        "INSERT INTO sessions (
+            game_id,
+            start_ts,
+            end_ts,
+            duration_seconds,
+            notes
+         )
+         VALUES (?1, ?2, ?3, ?4, ?5);",
+        params![
+            game_id,
+            start_str,
+            end_str,
+            session_data.duration_seconds,
+            session_data.notes
+        ]
+    )?;
 
-        Ok(())
+    tx.commit()?;
 
-    }();
-
-    match db_result
-    {
-        Ok(_) => return Ok(()),
-        Err(error) =>
-        {
-            return Err(error)
-        }
-    }
+    Ok(())
 }
 
 pub fn edit_session_notes(session_id: i64, updated_notes: &str) -> Result<(), AppError>
@@ -333,6 +565,25 @@ pub fn insert_cover_art(game_id: i64, cover_url: &str, is_auto_fetch: bool) -> R
     Ok(())
 }
 
+pub fn insert_process(game_id: i64, process_name: &str) -> Result<(), AppError>
+{
+    let conn = open_connection()?;
+
+    let affected = conn.execute(
+        "UPDATE games
+         SET process_name = ?1
+         WHERE game_id = ?2;",
+        params![process_name, game_id]
+    )?;
+
+    if affected == 0
+    {
+        return Err(AppError::Message("Game not found".to_string()));
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests
 {
@@ -351,6 +602,7 @@ mod tests
             end_ts: Utc.with_ymd_and_hms(2023, 10, 1, 16, 0, 0).unwrap(),
             duration_seconds: 7200,
             notes: Some(String::from("Completed main questline")),
+            process_name: String::from("")
         };
 
         // Struct with populated session notes.
@@ -361,6 +613,7 @@ mod tests
             end_ts: Utc.with_ymd_and_hms(2023, 10, 2, 9, 30, 0).unwrap(),
             duration_seconds: 1800,
             notes: None,
+            process_name: String::from("")
         };
         
         // Both session data structs are inserted to database.
@@ -385,6 +638,7 @@ mod tests
             end_ts: Utc::now(),
             duration_seconds: 0,
             notes: None,
+            process_name: String::from("")
         };
 
         // Struct data is inserted into database, error expected.
@@ -406,6 +660,7 @@ mod tests
             end_ts: Utc.with_ymd_and_hms(2023, 10, 5, 10, 0, 0).unwrap(), 
             duration_seconds: -7200, 
             notes: Some(String::from("Time is moving backwards")),
+            process_name: String::from("")
         };
 
         let result_one = insert_data(&conn, bad_session_negative_time);
@@ -425,6 +680,7 @@ mod tests
             end_ts: Utc.with_ymd_and_hms(2023, 10, 6, 8, 0, 0).unwrap(),
             duration_seconds: 0,
             notes: None,
+            process_name: String::from("")
         };
 
         let result_one = insert_data(&conn, edge_case_zero_duration);
@@ -444,6 +700,7 @@ mod tests
             end_ts: Utc.with_ymd_and_hms(2023, 10, 7, 20, 0, 0).unwrap(),
             duration_seconds: 7200,
             notes: Some("A".repeat(10_000)),
+            process_name: String::from("")
         };
 
         let result_one = insert_data(&conn, edge_case_huge_string);
