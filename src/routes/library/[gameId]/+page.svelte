@@ -12,8 +12,8 @@
     import SessionTimeline from "./SessionTimeline.svelte";
     import Stats from "./Stats.svelte";
     import Settings from "./Settings.svelte";
-    import { formatDuration, formatLocaleDate, formatTime } from "#lib/timeFormatting.js";
-    import type { GameCover, Game, GameStats, Session, GameTimeRangeStats } from "#lib/types.svelte.js";
+    import { formatDuration, formatLocaleDate } from "#lib/timeFormatting.js";
+    import type { GameCover, Game, GameStats, Session } from "#lib/types.svelte.js";
     import { getPlaytimeDateString } from "#lib/sessionStats.ts";
 
     interface RouteParams {
