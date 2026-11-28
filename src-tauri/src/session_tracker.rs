@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use crate::database_operations::{insert_data, open_connection, SessionRust, get_process_names};
-use crate::trigger_refresh;
+use crate::{trigger_refresh, refresh_tray_menu};
 use chrono::{Utc};
 use serde::Serialize;
 use std::{thread, time};
@@ -183,6 +183,14 @@ pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<At
 
         // The duration in seconds is calculated from elapsed time.
         let duration_seconds = (stopwatch_elapsed / 1000) as i64;
+
+        ended.store(true, Ordering::Relaxed);
+        pause.store(false, Ordering::Relaxed);
+
+        if let Err(error) = refresh_tray_menu(&app)
+        {
+            eprintln!("Failed to refresh tray menu: {:?}", error);
+        }
 
         // The data is gathered into the session_data struct.
         let session_data = SessionRust
