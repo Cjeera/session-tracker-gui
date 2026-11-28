@@ -60,5 +60,5 @@ export const config = {
 };
 
 export const autoSearch = $state({
-    autosearchOn: false
+    autosearchOn: true
 });

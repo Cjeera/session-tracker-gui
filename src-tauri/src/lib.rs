@@ -8,18 +8,31 @@ use crate::session_tracker::{track_session, end_session, process_search, Process
 use crate::database_operations::{get_games, get_stats, get_sessions, get_game_by_id, edit_session_notes, insert_cover_art, update_status, get_game_weekly_playtime, get_game_monthly_playtime, get_game_yearly_playtime, get_global_weekly_playtime, get_global_monthly_playtime, get_global_yearly_playtime, get_process_names, insert_process, Session, SessionRust, Game, GameStats, GameTimeRangeStats, GlobalTimeRangeStats};
 use crate::error::AppError;
 use tauri::Emitter;
-use tauri::{Listener, AppHandle, Builder, Manager, tray::{TrayIconBuilder}, menu::{Menu, MenuItem}};
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
+use tauri::{AppHandle, Builder, Manager, tray::{TrayIconBuilder}, menu::{Menu, MenuItem}};
+use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
 
-pub struct SessionState 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TrackerStatus
 {
-    paused: Arc<AtomicBool>,
-    ended: Arc<AtomicBool>,
+    Idle,
+    GameDetected(u32),
+    Running,
+    Paused,
+    Stopping,
+    AwaitingSubmission,
+}
+
+pub struct SessionState
+{
+    status: Mutex<TrackerStatus>,
+    // Ignore processes from completed sessions until they exit.
+    dismissed: Mutex<std::collections::HashSet<(u32, u64)>>,
 }
 
 pub struct RefreshState
 {
     refresh_auto_search: Arc<AtomicBool>,
+    enabled: AtomicBool,
 }
 
 pub struct TrayState
@@ -156,72 +169,61 @@ async fn search_processes(game_input: String) -> Result<Vec<Process>, AppError>
 #[tauri::command]
 async fn start_tracker(game_input: String, pid: u32, app: AppHandle) -> Result<(), AppError>
 {
-    let end_state = app.state::<SessionState>().ended.clone();
-    match track_session(
-        game_input,
-        pid,
-        app.clone(),
-    )
-    {
-        Ok(()) =>
-        {
-            refresh_tray_menu(&app)?;
-            Ok(())
-        },
-        Err(error) =>
-        {
-            end_state.store(true, Ordering::Relaxed);
-            refresh_tray_menu(&app)?;
-            Err(error)
-        },
+    track_session(game_input, pid, app.clone())?;
+    if let Err(error) = refresh_tray_menu(&app) {
+        eprintln!("Failed to refresh tray: {error}");
     }
+    Ok(())
 }
+
 #[tauri::command]
 fn toggle_pause(app: AppHandle) -> Result<(), AppError>
 {
-    let pause_state = app.state::<SessionState>().paused.clone();
-
-    pause_state.store(true, Ordering::Relaxed);
-
+    let session = app.state::<SessionState>();
+    {
+        let mut status = session.status.lock().unwrap();
+        if *status != TrackerStatus::Running { return Ok(()); }
+        *status = TrackerStatus::Paused;
+    }
     refresh_tray_menu(&app)?;
-
-    app.emit("session-state-changed", "paused")?;
-
+    app.emit("session-state-change", "paused")?;
     Ok(())
 }
 
 #[tauri::command]
 fn toggle_resume(app: AppHandle) -> Result<(), AppError>
 {
-    let pause_state = app.state::<SessionState>().paused.clone();
-
-    pause_state.store(false, Ordering::Relaxed);
-
+    let session = app.state::<SessionState>();
+    {
+        let mut status = session.status.lock().unwrap();
+        if *status != TrackerStatus::Paused { return Ok(()); }
+        *status = TrackerStatus::Running;
+    }
     refresh_tray_menu(&app)?;
-
-    app.emit("session-state-changed", "resumed")?;
-
+    app.emit("session-state-change", "resumed")?;
     Ok(())
 }
 
 #[tauri::command]
 fn toggle_end(app: AppHandle) -> Result<(), AppError>
 {
-    let end_state = app.state::<SessionState>().ended.clone();
-
-    end_state.store(true, Ordering::Relaxed);
-
+    let session = app.state::<SessionState>();
+    {
+        let mut status = session.status.lock().unwrap();
+        if !matches!(*status, TrackerStatus::Running | TrackerStatus::Paused) {
+            return Ok(());
+        }
+        *status = TrackerStatus::Stopping;
+    }
     refresh_tray_menu(&app)?;
-
+    // The tracking thread emits session-ended when it has finalised the data.
     Ok(())
 }
 
-/// Takes frontend input (session_notes) and the session_data struct and sends it to end_session function.
 #[tauri::command]
 fn end_tracker(app: AppHandle, session_notes: &str, session_data: SessionRust) -> Result<(), AppError>
 {
-    end_session(app, session_notes, session_data)?;
-    Ok(())
+    end_session(app, session_notes, session_data)
 }
 
 #[tauri::command]
@@ -252,9 +254,10 @@ async fn insert_selected_cover(cover: GameCover, game_id: i64, is_auto_fetch: bo
 }
 
 #[tauri::command]
-fn insert_process_name(game_id: i64, process_name: &str) -> Result<(), AppError>
+fn insert_process_name(game_id: i64, process_name: &str, app: AppHandle) -> Result<(), AppError>
 {
     insert_process(game_id, process_name)?;
+    trigger_refresh(&app);
 
     Ok(())
 }
@@ -266,31 +269,44 @@ fn get_processes(game_id: Option<i64>) -> Result<Vec<String>, AppError>
 }
 
 #[tauri::command]
-fn start_auto_search(app: AppHandle) -> Result<(), AppError>
+fn set_auto_search(app: AppHandle, enabled: bool)
 {
-    let refresh = app.state::<RefreshState>().refresh_auto_search.clone();
-    auto_search(app, refresh)?;
-    Ok(())
+    app.state::<RefreshState>().enabled.store(enabled, Ordering::Relaxed);
+    if enabled {
+        trigger_refresh(&app);
+    } else {
+        let session = app.state::<SessionState>();
+        let mut status = session.status.lock().unwrap();
+        if matches!(*status, TrackerStatus::GameDetected(_)) {
+            *status = TrackerStatus::Idle;
+        }
+    }
 }
 
 pub fn trigger_refresh(app: &AppHandle)
 {
-    app.state::<RefreshState>()
-        .refresh_auto_search
-        .store(true, Ordering::Relaxed);
+    app.state::<RefreshState>().refresh_auto_search.store(true, Ordering::Relaxed);
 }
 
 pub fn refresh_tray_menu(app: &AppHandle) -> tauri::Result<()>
 {
     let session = app.state::<SessionState>();
     let tray = app.state::<TrayState>();
+    let status = *session.status.lock().unwrap();
+    tray.pause.set_enabled(status == TrackerStatus::Running)?;
+    tray.resume.set_enabled(status == TrackerStatus::Paused)?;
+    tray.stop.set_enabled(matches!(status, TrackerStatus::Running | TrackerStatus::Paused))?;
+    Ok(())
+}
 
-    let paused = session.paused.load(Ordering::Relaxed);
-    let ended = session.ended.load(Ordering::Relaxed);
-
-    tray.pause.set_enabled(!paused && !ended)?;
-    tray.resume.set_enabled(paused && !ended)?;
-    tray.stop.set_enabled(!ended)?;
+fn show_main_window(app: &AppHandle) -> tauri::Result<()>
+{
+    if let Some(window) = app.get_webview_window("main")
+    {
+        window.show()?;
+        window.unminimize()?;
+        window.set_focus()?;
+    }
 
     Ok(())
 }
@@ -301,11 +317,21 @@ pub fn run() -> Result<(), AppError> {
 
     #[cfg(desktop)]
     {
-        builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+        builder = builder
+            .plugin(tauri_plugin_single_instance::init(
+                |app, args, _cwd|
+                {
+                    if !args.iter().any(|arg| arg == "--background")
+                    {
+                        let _ = show_main_window(app);
+                    }
+                }
+            ))
+            .plugin(tauri_plugin_updater::Builder::new().build());
     }
 
     builder
-        .plugin(tauri_plugin_autostart::Builder::new().build())
+        .plugin(tauri_plugin_autostart::Builder::new().args(["--background"]).build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
@@ -332,112 +358,68 @@ pub fn run() -> Result<(), AppError> {
             update_game_status,
             insert_process_name,
             get_processes,
-            start_auto_search,
+            set_auto_search
         ])
-        .setup(|app| 
+        .setup(|app|
         {
             use tauri_plugin_autostart::ManagerExt;
-
-            app.manage(SessionState 
-            {
-                paused: Arc::new(AtomicBool::new(false)),
-                ended: Arc::new(AtomicBool::new(true)),
+            app.manage(SessionState {
+                status: Mutex::new(TrackerStatus::Idle),
+                dismissed: Mutex::new(std::collections::HashSet::new()),
             });
-
-            
-            app.manage(RefreshState
-            {
-                refresh_auto_search: Arc::new(AtomicBool::new(false)),
+            app.manage(RefreshState {
+                refresh_auto_search: Arc::new(AtomicBool::new(true)),
+                enabled: AtomicBool::new(false),
             });
-
-            let autostart_manager = app.autolaunch();
-            let _ = autostart_manager.enable();
-
+            let _ = app.autolaunch().enable();
             let close_i = MenuItem::with_id(app, "close", "Close", true, None::<&str>)?;
             let exit_i = MenuItem::with_id(app, "exit", "Exit", true, None::<&str>)?;
             let open_i = MenuItem::with_id(app, "open", "Open", true, None::<&str>)?;
-            let pause_tracker_i = MenuItem::with_id(
-                app, "pause", "Pause Tracker", false, None::<&str>
-            )?;
+            let pause = MenuItem::with_id(app, "pause", "Pause Tracker", false, None::<&str>)?;
+            let resume = MenuItem::with_id(app, "resume", "Resume Tracker", false, None::<&str>)?;
+            let stop = MenuItem::with_id(app, "stop", "Stop Tracker", false, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&pause, &resume, &stop, &open_i, &close_i, &exit_i])?;
+            app.manage(TrayState { pause, resume, stop });
 
-            let resume_tracker_i = MenuItem::with_id(
-                app, "resume", "Resume Tracker", false, None::<&str>
-            )?;
-
-            let stop_tracker_i = MenuItem::with_id(
-                app, "stop", "Stop Tracker", false, None::<&str>
-            )?;
- 
-            let menu = Menu::with_items(app, &[&pause_tracker_i, &resume_tracker_i, &stop_tracker_i, &open_i, &close_i, &exit_i])?;
-
-            app.manage(TrayState
-            {
-                pause: pause_tracker_i,
-                resume: resume_tracker_i,
-                stop: stop_tracker_i,
-            });
-               
-            let tray = TrayIconBuilder::new()
+            let _tray = TrayIconBuilder::new()
                 .menu(&menu)
                 .show_menu_on_left_click(true)
                 .icon(app.default_window_icon().unwrap().clone())
-                .on_menu_event(|app, event| 
-                    {
-                        let window = app.get_webview_window("main").unwrap();
-                        match event.id.as_ref()
-                        {
-                            "close" => 
-                            {
-                                if !window.is_minimized().unwrap()
-                                {
-                                    window.minimize().unwrap();
-                                }
-                            }
-
-                            "exit" => 
-                            {
-                                let _ = window.close();
-                            }
-
-                            "open" => 
-                            {
-                                if window.is_minimized().unwrap()
-                                {
-                                    let _ = window.unminimize();
-                                    let _ = window.show();
-                                    let _ = window.set_focus();
-                                }
-                            }
-
-                            "pause" => 
-                            {
-                                let _ = toggle_pause(app.app_handle().clone());
-                                let _ = app.emit("session-state-change", "paused");
-                            }
-
-                            "resume" => 
-                            {
-                                let _ = toggle_resume(app.app_handle().clone());
-                                let _ = app.emit("session-state-change", "resumed");
-                            }
-
-                            "stop" => 
-                            {
-                                let _ = toggle_end(app.app_handle().clone());                   
-                                let _ = app.emit("session-state-change", "ended");
-                            }
-
-                            _ => {}
+                .on_menu_event(|app, event| {
+                    let window = app.get_webview_window("main").unwrap();
+                    match event.id.as_ref() {
+                        "close" => {
+                            let _ = window.hide();
                         }
-                    })
+                        "exit" => {
+                            app.exit(0);
+                        }
+                        "open" => {
+                            let _ = show_main_window(app);
+                        }
+                        "pause" => { if let Err(e) = toggle_pause(app.clone()) { eprintln!("{e}"); } }
+                        "resume" => { if let Err(e) = toggle_resume(app.clone()) { eprintln!("{e}"); } }
+                        "stop" => { if let Err(e) = toggle_end(app.clone()) { eprintln!("{e}"); } }
+                        _ => {}
+                    }
+                })
                 .build(app)?;
 
-            let handle = app.handle().clone();
+            let background = std::env::args()
+                .any(|arg| arg == "--background");
 
-            app.listen("start-auto-search", move |_| {
-                start_auto_search(handle.clone()).unwrap();
-            });
+            if !background
+            {
+                if let Some(window) = app.get_webview_window("main")
+                {
+                    window.show()?;
+                    window.set_focus()?;
+                }
+            }
 
+            // Exactly one search worker, initially disabled until the UI enables it.
+            let refresh = app.state::<RefreshState>().refresh_auto_search.clone();
+            auto_search(app.handle().clone(), refresh)?;
             Ok(())
         })
         .run(tauri::generate_context!())

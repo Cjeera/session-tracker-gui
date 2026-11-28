@@ -5,84 +5,99 @@
     import { Button } from "#lib/components/ui/button/index.ts";
     import { Toaster } from "#lib/components/ui/sonner/index.js";
     import { toast } from 'svelte-sonner';
-    
-    // Import the Tauri plugins
     import { check } from '@tauri-apps/plugin-updater';
     import { ask, message } from '@tauri-apps/plugin-dialog';
     import { relaunch } from '@tauri-apps/plugin-process';
     import { tracker } from "./sessionTracker.svelte.ts";
     import { getCurrentWindow } from "@tauri-apps/api/window";
-    import { emit, listen } from "@tauri-apps/api/event";
+    import { listen } from "@tauri-apps/api/event";
+    import { invoke } from "@tauri-apps/api/core";
     import { Switch } from "#lib/components/ui/switch/index.ts";
     import { Label } from "#lib/components/ui/label/index.js";
     import { autoSearch } from '#lib/types.svelte.ts';
     import type { Process } from '#lib/types.svelte.ts';
+    import {
+        isPermissionGranted,
+        requestPermission,
+        sendNotification,
+        } from '@tauri-apps/plugin-notification';
 
-    async function autoSearchTrigger() {
+    let autoSearchReady = $state(false);
+    let changingAutoSearch = $state(false);
+
+    async function autoSearchTrigger(enabled: boolean) {
+        if (changingAutoSearch) return;
+        changingAutoSearch = true;
         try {
-            if (autoSearch.autosearchOn) {
-                await emit("stop-auto-search");
-            } else {
-                await emit("start-auto-search");
-            }
-        } catch(error) {
-            console.log(String(error))
+            await invoke("set_auto_search", { enabled });
+            autoSearch.autosearchOn = enabled;
+        } catch (error) {
+            console.error(error);
             toast.error(String(error));
+        } finally {
+            changingAutoSearch = false;
         }
     }
 
     let { children } = $props();
     let activeUrl = $derived(page.url.pathname);
 
-    $effect(() => {
+    onMount(() => {
+        let disposed = false;
         let unlistenClose = () => {};
-        let unlictenAutoSearch = () => {};
+        let unlistenAutoSearch = () => {};
 
-        async function setupCloseListener() {
-            unlistenClose = await getCurrentWindow().onCloseRequested(async (event) => {
-                // Check if the tracker is running
-                if (tracker.stopwatchDisplay.length > 0) {
-                
-                    // Prevent the window from closing immediately
-                    event.preventDefault();
-
-                    // Ask the user
-                    const confirmed = await ask("Tracker is currently running. Close application?", {
-                        title: "Session Tracker GUI",
-                        kind: "warning"
-                    });
-
-                    // If they confirm, bypass the interceptor and destroy the window
-                    if (confirmed) {
-                        await getCurrentWindow().destroy(); 
+        async function setupListeners() {
+            try {
+                const unlisten = await listen<Process>("auto-search-game-found", async (event) => {
+                    if (autoSearch.autosearchOn && !changingAutoSearch) {
+                        void tracker.trackSession(event.payload);
                     }
-                }
-            });
+                    let permissionGranted = await isPermissionGranted();
+
+                    if (!permissionGranted) {
+                        const permission = await requestPermission();
+                        permissionGranted = permission === 'granted';
+                    }
+                    if (permissionGranted) {
+                        sendNotification({ title: 'Game Found', body: `Tracking ${tracker.gameInput}` });
+                    }
+                });
+                if (disposed) { unlisten(); return; }
+                unlistenAutoSearch = unlisten;
+                autoSearchReady = true;
+
+                const closeListener = await getCurrentWindow().onCloseRequested(async (event) => {
+                    if (tracker.gameFound) {
+                        event.preventDefault();
+                        const confirmed = await ask("A session is running or awaiting submission. Close application?", {
+                            title: "Session Tracker GUI",
+                            kind: "warning"
+                        });
+                        if (confirmed) await getCurrentWindow().destroy();
+                    }
+                });
+                if (disposed) closeListener();
+                else unlistenClose = closeListener;
+            } catch (error) {
+                console.error(error);
+                toast.error(String(error));
+            }
         }
-
-        async function setupAutoSearchListener() {
-            unlictenAutoSearch = await listen<Process>("auto-search-game-found", (event) => {
-                tracker.trackSession(event.payload);
-            });
-        } 
-
-        setupAutoSearchListener();
-        setupCloseListener();
-
-        // Cleanup the event listener if the Svelte component is destroyed
-        return () => {unlistenClose(), unlictenAutoSearch()};
+        void setupListeners();
+        return () => {
+            disposed = true;
+            unlistenClose();
+            unlistenAutoSearch();
+        };
     });
 
- 
-    // Run the update check once when the app starts
     onMount(async () => {
         try {
             const update = await check();
-            
             if (update) {
-                // Dialogue box is displayed for the user to update the app.                
                 const wantsToUpdate = await ask(
-                    `Version ${update.version} is available!\n\nRelease notes:\n${update.body}\n\nWould you like to install it now?`, 
+                    `Version ${update.version} is available!\n\nRelease notes:\n${update.body}\n\nWould you like to install it now?`,
                     {
                         title: 'Update Available!',
                         kind: 'info',
@@ -90,12 +105,8 @@
                         cancelLabel: 'Later'
                     }
                 );
-
                 if (wantsToUpdate) {
-                    // Downloads and installs the update silently in the background
                     await update.downloadAndInstall();
-                    
-                    // Notify the user and restart
                     await message('Update installed! The app will now restart.', { title: 'Success' });
                     await relaunch();
                 }
@@ -114,9 +125,9 @@
             <span class="font-mono text-xl tabular-nums" role="timer">{tracker.stopwatchDisplay}</span>
         {/if}
         <div class="flex gap-2 items-center">
-            {#if !tracker.stopwatchDisplay}
+            {#if !tracker.gameFound}
                 <Label class="cursor-pointer" for="auto-search">Auto Search</Label>
-                <Switch class="cursor-pointer" id="auto-search" bind:checked={autoSearch.autosearchOn} onclick={async () => await autoSearchTrigger()}/>
+                <Switch class="cursor-pointer" id="auto-search" checked={autoSearch.autosearchOn} disabled={!autoSearchReady || changingAutoSearch} onCheckedChange={autoSearchTrigger}/>
             {/if}
             <Button href="/" variant={activeUrl === "/" ? "secondary" : "ghost"} aria-current={activeUrl === "/" ? "page" : undefined}>Session Tracker</Button>
             <Button href="/stats" variant={activeUrl.startsWith("/stats") ? "secondary" : "ghost"} aria-current={activeUrl.startsWith("/stats") ? "page" : undefined}>Stats</Button>
