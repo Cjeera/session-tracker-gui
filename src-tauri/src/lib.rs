@@ -9,7 +9,6 @@ use crate::database_operations::{get_games, get_stats, get_sessions, get_game_by
 use crate::error::AppError;
 use tauri::Emitter;
 use tauri::{Listener, AppHandle, Builder, Manager, tray::{TrayIconBuilder}, menu::{Menu, MenuItem}};
-use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 
 pub struct SessionState 
@@ -157,18 +156,11 @@ async fn search_processes(game_input: String) -> Result<Vec<Process>, AppError>
 #[tauri::command]
 async fn start_tracker(game_input: String, pid: u32, app: AppHandle) -> Result<(), AppError>
 {
-    let pause_state = app.state::<SessionState>().paused.clone();
     let end_state = app.state::<SessionState>().ended.clone();
-
-    end_state.store(false, Ordering::Relaxed);
-    pause_state.store(false, Ordering::Relaxed);
-
     match track_session(
         game_input,
         pid,
         app.clone(),
-        pause_state,
-        end_state.clone()
     )
     {
         Ok(()) =>
@@ -226,9 +218,9 @@ fn toggle_end(app: AppHandle) -> Result<(), AppError>
 
 /// Takes frontend input (session_notes) and the session_data struct and sends it to end_session function.
 #[tauri::command]
-fn end_tracker(session_notes: &str, session_data: SessionRust) -> Result<(), AppError>
+fn end_tracker(app: AppHandle, session_notes: &str, session_data: SessionRust) -> Result<(), AppError>
 {
-    end_session(session_notes, session_data)?;
+    end_session(app, session_notes, session_data)?;
     Ok(())
 }
 
@@ -446,7 +438,6 @@ pub fn run() -> Result<(), AppError> {
                 start_auto_search(handle.clone()).unwrap();
             });
 
-            start_auto_search(app.handle().clone())?;
             Ok(())
         })
         .run(tauri::generate_context!())
