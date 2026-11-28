@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     import { onMount } from 'svelte';
     import { page } from "$app/state";
     import "../app.css";
@@ -12,10 +12,11 @@
     import { relaunch } from '@tauri-apps/plugin-process';
     import { tracker } from "./sessionTracker.svelte.ts";
     import { getCurrentWindow } from "@tauri-apps/api/window";
-    import { emit } from "@tauri-apps/api/event";
+    import { emit, listen } from "@tauri-apps/api/event";
     import { Switch } from "#lib/components/ui/switch/index.ts";
     import { Label } from "#lib/components/ui/label/index.js";
     import { autoSearch } from '#lib/types.svelte.ts';
+    import type { Process } from '#lib/types.svelte.ts';
 
     async function autoSearchTrigger() {
         try {
@@ -34,10 +35,11 @@
     let activeUrl = $derived(page.url.pathname);
 
     $effect(() => {
-        let unlisten = () => {};
+        let unlistenClose = () => {};
+        let unlictenAutoSearch = () => {};
 
         async function setupCloseListener() {
-            unlisten = await getCurrentWindow().onCloseRequested(async (event) => {
+            unlistenClose = await getCurrentWindow().onCloseRequested(async (event) => {
                 // Check if the tracker is running
                 if (tracker.stopwatchDisplay.length > 0) {
                 
@@ -57,9 +59,18 @@
                 }
             });
         }
+
+        async function setupAutoSearchListener() {
+            unlictenAutoSearch = await listen<Process>("auto-search-game-found", (event) => {
+                tracker.trackSession(event.payload);
+            });
+        } 
+
+        setupAutoSearchListener();
         setupCloseListener();
+
         // Cleanup the event listener if the Svelte component is destroyed
-        return () => unlisten();
+        return () => {unlistenClose(), unlictenAutoSearch()};
     });
 
  
@@ -103,8 +114,10 @@
             <span class="font-mono text-xl tabular-nums" role="timer">{tracker.stopwatchDisplay}</span>
         {/if}
         <div class="flex gap-2 items-center">
-        	<Label class="cursor-pointer" for="auto-search">Auto Search</Label>
-            <Switch class="cursor-pointer" id="auto-search" bind:checked={autoSearch.autosearchOn} onclick={async () => await autoSearchTrigger()}/>
+            {#if !tracker.stopwatchDisplay}
+                <Label class="cursor-pointer" for="auto-search">Auto Search</Label>
+                <Switch class="cursor-pointer" id="auto-search" bind:checked={autoSearch.autosearchOn} onclick={async () => await autoSearchTrigger()}/>
+            {/if}
             <Button href="/" variant={activeUrl === "/" ? "secondary" : "ghost"} aria-current={activeUrl === "/" ? "page" : undefined}>Session Tracker</Button>
             <Button href="/stats" variant={activeUrl.startsWith("/stats") ? "secondary" : "ghost"} aria-current={activeUrl.startsWith("/stats") ? "page" : undefined}>Stats</Button>
             <Button href="/library" variant={activeUrl.startsWith("/library") ? "secondary" : "ghost"} aria-current={activeUrl.startsWith("/library") ? "page" : undefined}>Library</Button>
