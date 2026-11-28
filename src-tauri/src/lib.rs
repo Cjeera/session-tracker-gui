@@ -10,6 +10,12 @@ use crate::error::AppError;
 use tauri::Emitter;
 use tauri::{AppHandle, Builder, Manager, tray::{TrayIconBuilder}, menu::{Menu, MenuItem}};
 use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
+use tauri::WindowEvent;
+use tauri_plugin_dialog::{
+    DialogExt,
+    MessageDialogKind,
+    MessageDialogButtons
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TrackerStatus
@@ -390,10 +396,49 @@ pub fn run() -> Result<(), AppError> {
                     let window = app.get_webview_window("main").unwrap();
                     match event.id.as_ref() {
                         "close" => {
-                            let _ = window.hide();
+                            let _ = window.close();
                         }
                         "exit" => {
-                            app.exit(0);
+                            let status = *app.state::<SessionState>()
+                                .status.lock().unwrap();
+
+                            let warning = match status
+                            {
+                                TrackerStatus::Running |
+                                TrackerStatus::Paused |
+                                TrackerStatus::Stopping => {
+                                    Some("A session is in progress. Exit without saving?")
+                                }
+
+                                TrackerStatus::AwaitingSubmission => {
+                                    Some("You have an unsaved session. Exit without saving?")
+                                }
+
+                                _ => None
+                            };
+
+                            if let Some(warning) = warning
+                            {
+                                let handle = app.clone();
+
+                                let _ = show_main_window(app);
+
+                                app.dialog()
+                                    .message(warning)
+                                    .title("Exit Session Tracker")
+                                    .kind(MessageDialogKind::Warning)
+                                    .buttons(MessageDialogButtons::YesNo)
+                                    .show(move |confirmed| {
+                                        if confirmed
+                                        {
+                                            handle.exit(0);
+                                        }
+                                    });
+                            }
+                            else
+                            {
+                                app.exit(0);
+                            }
                         }
                         "open" => {
                             let _ = show_main_window(app);
@@ -422,6 +467,49 @@ pub fn run() -> Result<(), AppError> {
             let refresh = app.state::<RefreshState>().refresh_auto_search.clone();
             auto_search(app.handle().clone(), refresh)?;
             Ok(())
+        }).on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event
+            {
+                if window.label() != "main"
+                {
+                    return;
+                }
+
+                // Prevent the window from being destroyed.
+                api.prevent_close();
+
+                let status = *window
+                    .state::<SessionState>()
+                    .status.lock().unwrap();
+
+                if matches!(
+                    status,
+                    TrackerStatus::AwaitingSubmission |
+                    TrackerStatus::Stopping
+                )
+                {
+                    let window = window.clone();
+
+                    window.app_handle().dialog()
+                        .message(
+                            "You have an unsaved session. \
+                            Hide the application to the system tray?"
+                        )
+                        .title("Unsaved Session")
+                        .kind(MessageDialogKind::Warning)
+                        .buttons(MessageDialogButtons::YesNo)
+                        .show(move |confirmed| {
+                            if confirmed
+                            {
+                                let _ = window.hide();
+                            }
+                        });
+                }
+                else
+                {
+                    let _ = window.hide();
+                }
+            }
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

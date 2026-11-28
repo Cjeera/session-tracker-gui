@@ -9,7 +9,6 @@
     import { ask, message } from '@tauri-apps/plugin-dialog';
     import { relaunch } from '@tauri-apps/plugin-process';
     import { tracker } from "./sessionTracker.svelte.ts";
-    import { getCurrentWindow } from "@tauri-apps/api/window";
     import { listen } from "@tauri-apps/api/event";
     import { invoke } from "@tauri-apps/api/core";
     import { Switch } from "#lib/components/ui/switch/index.ts";
@@ -74,19 +73,6 @@
                 });
 
                 autoSearchReady = true;
-
-                const closeListener = await getCurrentWindow().onCloseRequested(async (event) => {
-                    if (tracker.gameFound) {
-                        event.preventDefault();
-                        const confirmed = await ask("A session is running or awaiting submission. Close application?", {
-                            title: "Session Tracker GUI",
-                            kind: "warning"
-                        });
-                        if (confirmed) await getCurrentWindow().destroy();
-                    }
-                });
-                if (disposed) closeListener();
-                else unlistenClose = closeListener;
             } catch (error) {
                 console.error(error);
                 toast.error(String(error));
@@ -95,7 +81,6 @@
         void setupListeners();
         return () => {
             disposed = true;
-            unlistenClose();
             unlistenAutoSearch();
         };
     });
