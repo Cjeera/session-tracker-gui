@@ -1,6 +1,6 @@
 use crate::error::AppError;
 use crate::database_operations::{insert_data, open_connection, SessionRust, get_process_names};
-use crate::{trigger_refresh, refresh_tray_menu};
+use crate::{RefreshState, SessionState, refresh_tray_menu, trigger_refresh};
 use chrono::{Utc};
 use serde::Serialize;
 use std::{thread, time};
@@ -118,8 +118,14 @@ fn stopwatch_stop(app: &AppHandle, stopwatch: &mut StopwatchImpl<Instant>) -> Re
 }
 
 /// Tracks a running application's session time. Returns a struct containing session data.
-pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<AtomicBool>, ended: Arc<AtomicBool>) -> Result<(), AppError>
+pub fn track_session(game_input: String, pid: u32, app: AppHandle) -> Result<(), AppError>
 {
+    let pause_state = app.state::<SessionState>().paused.clone();
+    let end_state = app.state::<SessionState>().ended.clone();
+
+    end_state.store(false, Ordering::Relaxed);
+    pause_state.store(false, Ordering::Relaxed);
+
     // Gets a list of all running processes.
     let mut system = System::new_with_specifics(RefreshKind::nothing().with_processes(ProcessRefreshKind::everything()))?;
 
@@ -149,13 +155,13 @@ pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<At
             thread::sleep(sleep_time);
 
             // Exits the loop if the program isn't running or the user stops the session.
-            if !process_exists(&mut system, pid) || ended.load(Ordering::Relaxed)
+            if !process_exists(&mut system, pid) || end_state.load(Ordering::Relaxed)
             {
                 break;
             }
 
             // If/esle block that handles pause and resume.
-            if pause.load(Ordering::Relaxed)
+            if end_state.load(Ordering::Relaxed)
             {
                 // If stopwatch isn't stopped, meaning the user has clicked pause, stopwatch is stopped.
                 if !stopwatch.is_stopped()
@@ -184,8 +190,8 @@ pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<At
         // The duration in seconds is calculated from elapsed time.
         let duration_seconds = (stopwatch_elapsed / 1000) as i64;
 
-        ended.store(true, Ordering::Relaxed);
-        pause.store(false, Ordering::Relaxed);
+        end_state.store(true, Ordering::Relaxed);
+        pause_state.store(false, Ordering::Relaxed);
 
         if let Err(error) = refresh_tray_menu(&app)
         {
@@ -206,13 +212,12 @@ pub fn track_session(game_input: String, pid: u32, app: AppHandle, pause: Arc<At
         app.emit("session-ended", session_data).unwrap();
  
     });
-
     
     Ok(())
 }
 
 /// Handles sending data to be inserted into the db.
-pub fn end_session(session_notes: &str, mut session_data: SessionRust) -> Result<(), AppError>
+pub fn end_session(app: AppHandle, session_notes: &str, mut session_data: SessionRust) -> Result<(), AppError>
 {
     // Sets sessions notes to None if empty, assigns Some(session_notes) to the struct field if not. 
     if session_notes.is_empty()
@@ -228,8 +233,10 @@ pub fn end_session(session_notes: &str, mut session_data: SessionRust) -> Result
     
     // The struct data is inserted into the database.
     insert_data(&conn, session_data)?;
-    
 
+    let refresh = app.state::<RefreshState>().refresh_auto_search.clone();
+
+    auto_search(app, refresh)?;
 
     Ok(())
 }
@@ -242,12 +249,12 @@ pub fn auto_search(app: AppHandle, refresh: Arc<AtomicBool>) -> Result<(), AppEr
     thread::spawn(move || {
         let handle = app.app_handle().clone();
         
-        app.listen("refresh-auto-search", move |_event|
+        app.listen("refresh-auto-search", move |_|
         {
             trigger_refresh(&handle);
         });
 
-        app.listen("stop-auto-search", |event| {
+        app.listen("stop-auto-search", |_| {
             return; 
         });
 
@@ -262,8 +269,9 @@ pub fn auto_search(app: AppHandle, refresh: Arc<AtomicBool>) -> Result<(), AppEr
             system.refresh_processes_specifics(ProcessesToUpdate::All, true, ProcessRefreshKind::nothing());
             for process in &process_names
             {
-                if system.processes_by_exact_name(OsStr::new(&process)).find(|n| n.exists()).is_some() 
+                if let Some(found) = system.processes_by_exact_name(OsStr::new(&process)).find(|n| n.exists())
                 {
+                    let _ = app.emit("auto-search-game-found", Process { pid: found.pid().as_u32(), name: found.name().to_str().unwrap().to_string() });
                     break 'main;
                 }
             }
