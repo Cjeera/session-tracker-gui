@@ -7,6 +7,7 @@ use crate::api_requests::{get_cover_art, GameCover};
 use crate::session_tracker::{track_session, end_session, process_search, Process, auto_search};
 use crate::database_operations::{get_games, get_stats, get_sessions, get_game_by_id, edit_session_notes, insert_cover_art, update_status, get_game_weekly_playtime, get_game_monthly_playtime, get_game_yearly_playtime, get_global_weekly_playtime, get_global_monthly_playtime, get_global_yearly_playtime, get_process_names, insert_process, Session, SessionRust, Game, GameStats, GameTimeRangeStats, GlobalTimeRangeStats};
 use crate::error::AppError;
+use tauri::Emitter;
 use tauri::{Listener, AppHandle, Builder, Manager, tray::{TrayIconBuilder}, menu::{Menu, MenuItem}};
 use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
@@ -20,6 +21,13 @@ pub struct SessionState
 pub struct RefreshState
 {
     refresh_auto_search: Arc<AtomicBool>,
+}
+
+pub struct TrayState
+{
+    pause: MenuItem<tauri::Wry>,
+    resume: MenuItem<tauri::Wry>,
+    stop: MenuItem<tauri::Wry>,
 }
 
 #[tauri::command]
@@ -151,22 +159,41 @@ async fn start_tracker(game_input: String, pid: u32, app: AppHandle) -> Result<(
 {
     let pause_state = app.state::<SessionState>().paused.clone();
     let end_state = app.state::<SessionState>().ended.clone();
-    
+
     end_state.store(false, Ordering::Relaxed);
     pause_state.store(false, Ordering::Relaxed);
 
-    match track_session(game_input, pid, app.clone(), pause_state, end_state)
+    match track_session(
+        game_input,
+        pid,
+        app.clone(),
+        pause_state,
+        end_state.clone()
+    )
     {
-        Ok(()) => Ok(()),
-        Err(error) => Err(error),
+        Ok(()) =>
+        {
+            refresh_tray_menu(&app)?;
+            Ok(())
+        },
+        Err(error) =>
+        {
+            end_state.store(true, Ordering::Relaxed);
+            refresh_tray_menu(&app)?;
+            Err(error)
+        },
     }
 }
-
 #[tauri::command]
 fn toggle_pause(app: AppHandle) -> Result<(), AppError>
 {
     let pause_state = app.state::<SessionState>().paused.clone();
+
     pause_state.store(true, Ordering::Relaxed);
+
+    refresh_tray_menu(&app)?;
+
+    app.emit("session-state-changed", "paused")?;
 
     Ok(())
 }
@@ -175,7 +202,12 @@ fn toggle_pause(app: AppHandle) -> Result<(), AppError>
 fn toggle_resume(app: AppHandle) -> Result<(), AppError>
 {
     let pause_state = app.state::<SessionState>().paused.clone();
+
     pause_state.store(false, Ordering::Relaxed);
+
+    refresh_tray_menu(&app)?;
+
+    app.emit("session-state-changed", "resumed")?;
 
     Ok(())
 }
@@ -184,7 +216,10 @@ fn toggle_resume(app: AppHandle) -> Result<(), AppError>
 fn toggle_end(app: AppHandle) -> Result<(), AppError>
 {
     let end_state = app.state::<SessionState>().ended.clone();
+
     end_state.store(true, Ordering::Relaxed);
+
+    refresh_tray_menu(&app)?;
 
     Ok(())
 }
@@ -253,6 +288,21 @@ pub fn trigger_refresh(app: &AppHandle)
         .store(true, Ordering::Relaxed);
 }
 
+pub fn refresh_tray_menu(app: &AppHandle) -> tauri::Result<()>
+{
+    let session = app.state::<SessionState>();
+    let tray = app.state::<TrayState>();
+
+    let paused = session.paused.load(Ordering::Relaxed);
+    let ended = session.ended.load(Ordering::Relaxed);
+
+    tray.pause.set_enabled(!paused && !ended)?;
+    tray.resume.set_enabled(paused && !ended)?;
+    tray.stop.set_enabled(!ended)?;
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() -> Result<(), AppError> {
     let mut builder = Builder::default();
@@ -314,11 +364,26 @@ pub fn run() -> Result<(), AppError> {
             let close_i = MenuItem::with_id(app, "close", "Close", true, None::<&str>)?;
             let exit_i = MenuItem::with_id(app, "exit", "Exit", true, None::<&str>)?;
             let open_i = MenuItem::with_id(app, "open", "Open", true, None::<&str>)?;
-            let pause_tracker_i = MenuItem::with_id(app, "pause", "Pause Tracker", app.state::<SessionState>().paused.load(Ordering::Relaxed) & !app.state::<SessionState>().ended.load(Ordering::Relaxed), None::<&str>)?;
-            let resume_tracker_i = MenuItem::with_id(app, "resume", "Resume Tracker", !app.state::<SessionState>().paused.load(Ordering::Relaxed) & !app.state::<SessionState>().ended.load(Ordering::Relaxed), None::<&str>)?;
-            let stop_tracker_i = MenuItem::with_id(app, "stop", "Stop Tracker", !app.state::<SessionState>().ended.load(Ordering::Relaxed), None::<&str>)?;
+            let pause_tracker_i = MenuItem::with_id(
+                app, "pause", "Pause Tracker", false, None::<&str>
+            )?;
+
+            let resume_tracker_i = MenuItem::with_id(
+                app, "resume", "Resume Tracker", false, None::<&str>
+            )?;
+
+            let stop_tracker_i = MenuItem::with_id(
+                app, "stop", "Stop Tracker", false, None::<&str>
+            )?;
  
             let menu = Menu::with_items(app, &[&pause_tracker_i, &resume_tracker_i, &stop_tracker_i, &open_i, &close_i, &exit_i])?;
+
+            app.manage(TrayState
+            {
+                pause: pause_tracker_i,
+                resume: resume_tracker_i,
+                stop: stop_tracker_i,
+            });
                
             let tray = TrayIconBuilder::new()
                 .menu(&menu)
@@ -339,45 +404,35 @@ pub fn run() -> Result<(), AppError> {
 
                             "exit" => 
                             {
-                                if !app.state::<SessionState>().ended.load(Ordering::Relaxed)
-                                {
-                                    app.dialog()
-                                        .message("Tracker is running. Close application?")
-                                        .kind(MessageDialogKind::Warning)
-                                        .title("Warning")
-                                        .buttons(tauri_plugin_dialog::MessageDialogButtons::YesNo)
-                                        .show(move |result| match result {
-                                            true => { let _ = &window.destroy().unwrap(); }
-                                            false => {}
-                                        })
-                                }
-                                else 
-                                {
-                                    let _ = &window.destroy().unwrap();
-                                }
+                                let _ = window.close();
                             }
 
                             "open" => 
                             {
                                 if window.is_minimized().unwrap()
                                 {
-                                    window.maximize().unwrap();
+                                    let _ = window.unminimize();
+                                    let _ = window.show();
+                                    let _ = window.set_focus();
                                 }
                             }
 
                             "pause" => 
                             {
                                 let _ = toggle_pause(app.app_handle().clone());
+                                let _ = app.emit("session-state-change", "paused");
                             }
 
                             "resume" => 
                             {
                                 let _ = toggle_resume(app.app_handle().clone());
+                                let _ = app.emit("session-state-change", "resumed");
                             }
 
                             "stop" => 
                             {
-                                let _ = toggle_end(app.app_handle().clone());
+                                let _ = toggle_end(app.app_handle().clone());                   
+                                let _ = app.emit("session-state-change", "ended");
                             }
 
                             _ => {}
