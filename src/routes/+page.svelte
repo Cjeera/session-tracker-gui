@@ -15,16 +15,16 @@
 
 </script>
 
-<main class="mx-auto flex min-h-[calc(100vh-5rem)] max-w-3xl flex-col items-center justify-center gap-8 px-4 py-12">
+<main class="mx-auto flex min-h-[calc(100vh-5rem)] max-w-3xl flex-col items-center justify-center gap-2 px-4 py-12">
   <form class="flex w-full max-w-md flex-col items-center" onsubmit={tracker.searchProcesses}>
     <h2 class="mb-8 text-center text-4xl font-bold">{tracker.headerMessage}</h2>
     {#if tracker.gameFound}
-      <h3 class="mb-4 font-mono text-2xl font-bold tabular-nums" role="timer">{tracker.stopwatchDisplay}</h3>
-      <div class="flex h-8 items-center justify-center">
+      <h3 class="mb-2 font-mono text-2xl font-bold tabular-nums" role="timer">{tracker.stopwatchDisplay}</h3>
         {#if tracker.paused && Object.keys(tracker.sessionData).length === 0}
-          <h4 class="text-xl font-semibold">Session Paused!</h4>
+          <div class="flex h-8 items-center justify-center">
+            <h4 class="text-xl font-semibold">Session Paused!</h4>
+          </div>
         {/if}
-      </div>
       {#if Object.keys(tracker.sessionData).length === 0}
         <div class="mt-4 flex gap-2">
           {#if tracker.paused}
