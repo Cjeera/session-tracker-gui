@@ -8,6 +8,7 @@ use crate::session_tracker::{track_session, end_session, process_search, Process
 use crate::database_operations::{get_games, get_stats, get_sessions, get_game_by_id, edit_session_notes, insert_cover_art, update_status, get_game_weekly_playtime, get_game_monthly_playtime, get_game_yearly_playtime, get_global_weekly_playtime, get_global_monthly_playtime, get_global_yearly_playtime, get_process_names, insert_process, Session, SessionRust, Game, GameStats, GameTimeRangeStats, GlobalTimeRangeStats};
 use crate::error::AppError;
 use tauri::Emitter;
+use tauri::tray::TrayIconEvent;
 use tauri::{AppHandle, Builder, Manager, tray::{TrayIconBuilder}, menu::{Menu, MenuItem}};
 use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
 use tauri::WindowEvent;
@@ -392,6 +393,15 @@ pub fn run() -> Result<(), AppError> {
                 .menu(&menu)
                 .show_menu_on_left_click(true)
                 .icon(app.default_window_icon().unwrap().clone())
+                .on_tray_icon_event(|tray, event| match event {
+                    TrayIconEvent::DoubleClick { id, position, rect, button 
+                } => {
+                    let window = tray.app_handle();
+                    let _ = show_main_window(window);
+                    
+                }
+                _ => {}
+                })
                 .on_menu_event(|app, event| {
                     let window = app.get_webview_window("main").unwrap();
                     match event.id.as_ref() {
