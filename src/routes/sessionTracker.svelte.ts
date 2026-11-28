@@ -71,6 +71,7 @@ class SessionTracker {
     }
 
     trackSession = async (process: Process) => {
+        this.stopwatchDisplay = "Elapsed Time: 00:00:00"
         this.paused = false;
         this.searchSuccessful = false;
         this.errorFlag = false;
