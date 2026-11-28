@@ -334,6 +334,7 @@ pub fn run() -> Result<(), AppError> {
         .plugin(tauri_plugin_autostart::Builder::new().args(["--background"]).build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             start_tracker, 

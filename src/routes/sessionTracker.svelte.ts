@@ -111,22 +111,29 @@ class SessionTracker {
                     String(this.minutes).padStart(2, "0") + ":" +
                     String(this.seconds).padStart(2, "0");
             });
-            this.unlistenSessionEnd = await listen<SessionPayload>("session-ended", async (event) => {
-                let permissionGranted = await isPermissionGranted();
-                if (!permissionGranted) {
-                    const permission = await requestPermission();
-                    permissionGranted = permission === 'granted';
-                }
+            
+            this.unlistenSessionEnd = await listen<SessionPayload>(
+                "session-ended", async (event) => {
+                    let permissionGranted = await isPermissionGranted();
 
-                if (permissionGranted) {
-                    sendNotification({ title: 'Session Ended', body: `${this.stopwatchDisplay}` });
-                }
+                    if (!permissionGranted) {
+                        const permission = await requestPermission();
+                        permissionGranted = permission === 'granted';
+                    }
 
-                this.sessionData = event.payload;
-                this.headerMessage = "Session ended!";
-                this.paused = false;
-                this.stopping = false;
-            });
+                    if (permissionGranted) {
+                        sendNotification({
+                            title: 'Session Ended',
+                            body: `${this.stopwatchDisplay}`
+                        });
+                    }
+
+                    this.sessionData = event.payload;
+                    this.headerMessage = "Session ended!";
+                    this.paused = false;
+                    this.stopping = false;
+                }
+            );
 
             // Set up the listeners before starting the backend worker.
             this.stopwatchDisplay = "Elapsed Time: 00:00:00";
