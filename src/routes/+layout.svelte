@@ -63,8 +63,16 @@
                         sendNotification({ title: 'Game Found', body: `Tracking ${tracker.gameInput}` });
                     }
                 });
+                
                 if (disposed) { unlisten(); return; }
+
                 unlistenAutoSearch = unlisten;
+
+                // Synchronise the backend with the default frontend setting.
+                await invoke("set_auto_search", {
+                    enabled: autoSearch.autosearchOn
+                });
+
                 autoSearchReady = true;
 
                 const closeListener = await getCurrentWindow().onCloseRequested(async (event) => {
